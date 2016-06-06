@@ -8,15 +8,12 @@
 #
 # $Id$
 #
-use strict;
-
 use CGI::Carp qw(fatalsToBrowser);
 use CGI qw/:standard/;
 use CGI::Cookie;
 use CGI;
 
-use File::Basename qw(basename dirname fileparse);
-
+use strict;
 use DBI;
 use DBD::mysql;
 use utf8;
@@ -104,7 +101,8 @@ my %spec = (
 );
 
 #my $cpath   = "secure/";
-#my $cpath   = "";
+my $cpath   = "";
+my $prog    = "kuma.cgi";
 
 my $atinfo   = "atinfo";
 my $atmugi   = "atmugi";
@@ -139,12 +137,6 @@ my $comment_table = "comment";
 #show_tail();
 
 #exit(0);
-
-my $chibipublic   = "/home/qshino/public_html";
-my ($prog,$cpath) = fileparse $0;
-$cpath =~ s!^\/!! ;
-
-# my $prog = "kuma.cgi";
 
 sub usage {
     print "kuma.pl init           : create table\n";
@@ -440,9 +432,6 @@ sub show_head {
 }
 
 sub show_tail {
-    print "<hr>";
-    #    print "prog=$prog dir=$dirname";
-    print "Copyright(C) 2016, zolo All right reserved.";
     print '</body>';
     print '</html>';
 }
@@ -2333,9 +2322,6 @@ if( $info =~ /show/ ){
     } else {
 	print "unmatched\n";
     }
-} elsif ( $info eq "basename" ){
-    my($base, $dir ) = fileparse "/a/b/c/d/e.f";
-    print "base=$base, dir=$dir\n";
 } else {
 
     show_head();
