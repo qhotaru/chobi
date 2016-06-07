@@ -34,7 +34,24 @@ use Time::Local;
 #
 # Globals
 #
-my $fakenow;
+
+my %msg = (
+    "reserve"   => "予約",
+    "gone"      => "発射済",
+    "new"       => "新規",
+    "recommend" => "推奨",
+    "show"      => "表示",
+    );
+
+foreach my $ee (keys %msg){
+    $msg{$ee} = encode('utf-8', $msg{$ee});
+}
+
+# tables for fake now
+my $fakenow  = "fakelist";
+my $fakeuser = "fakeuser";
+my $fakevil  = "fakevil";
+
 my $g_cookie;
 my %mugiunit = (
     # Roman [rejo pre  peri lega  pera zari ram cat gi  pio hero]
@@ -417,6 +434,8 @@ sub show_head {
   print get_menu_item("atinfo","atinfo");
   print "||";
   print get_menu_item("armlog","armlog");
+  print "||";
+  print get_menu_item("fake","fake");
 
   my $msg = encode('utf-8', "他サイト");
     
@@ -1172,14 +1191,11 @@ sub init_fakenow {
 
     my $sql = "select 1 from $fakenow";
     my $ret = $db->selectrow_array($sql);
-    print "$fakenow select 1 from table = $ret\n";
 
     if( !defined($ret) ){
 	$sql = "create table fakenow (id serial, rev int, arriavel datetime, note varchar(256) );";
 	$ret = $db->do($sql);
-	print "$fakenow create table = $ret\n";
     }
-
     return $ret;
 }
 
@@ -1189,8 +1205,7 @@ sub show_fakenow {
     my $db = open_db();
     init_fakenow($db);
 
-    # left
-    print "<div class=fl>";
+    print "<form method=post action=/$script/fake/exec>\n";
 
     my $sql = "select id, rev, arrival from $fakenow order by id desc limit 1;";
     my ($id,$rev,$arrival) = $db->selectrow_array($sql);
@@ -1199,56 +1214,92 @@ sub show_fakenow {
 	$id = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
-    print "<p>FakeID : $id</P>";
-    print "<p>FakeRev: $rev</P>";
-    print "<p>Arrival: $arrival</P>";
 
+    # Top div
+    print "<div>";
+
+    print "<table border=0>";
+    print "<tr>";
+    print "<td>FakeID/Rev</td><td>$id/$rev</td>";
+    print "<td>Arrival</td><td><input type=text name=arrival value=\"$arrival\"></td>";
+    print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
+    print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
+    print "<td>VEL</td><td><input type=text size=5 name=vel value=$vel></td>";
+    print "<td>TSQ</td><td><input type=text size=5 name=tsq value=$tsq></td>";
+    print "</tr>";
+    print "</table>";
+
+    print "<p>";
+    print "<input type=submit name=exec value=$msg{show}>";
+    print "<input type=submit name=exec value=$msg{reserve}>";
+    print "<input type=submit name=exec value=$msg{gone}>";
+    print "<input type=submit name=exec value=$msg{recommend}>";
+    print "<input type=submit name=exec value=$msg{new}>";
+    print "</p>";
+
+    print "</div>";
+
+    
+    # print "<div style=\"clear:both;\"></div>\n";
+    
+    # left div
+    # print "<div class=fl>";
+
+    print "<div style=\"float:left;\">";
     # players list
     # username, checkbox
-    print "<form method=post action=$script/fake/target>\n";
-
-    print "<p>";
-    print "X: <input type=text size=5 name=x>";
-    print "</p>";
-    print "<p>";
-    print "Y: <input type=text size=5 name=y>";
-    print "</p>";
-    print "<p>";
-    print "VEL: <input type=text size=5 name=vel>";
-    print "</p>";
-    print "<p>";
-    print "TSQ: <input type=text size=5 name=tsq>";
-    print "</p>";
-
-    print "<p>";
-    print "<input type=submit name=exec value=reserve>";
-    print "<input type=submit name=exec value=gone>";
-    print "<input type=submit name=exec value=recommend>";
-    print "<input type=submit name=exec value=next>";
-    print "</p>";
-    
-    $sql = "select user, concat('<input type=checkbox name=player value=', uid, '>') chk from last l where aid = 22 group by uid;";
+    $sql = "select user, concat('<input type=checkbox name=player value=', uid, '>') chk from last l where aid = 22 group by uid order by sum(population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
+
+    print "</div>\n";
+
+    print "<div style=\"float:left;width=10px;\"></div>";
+    
+    # right div
+    print "<div style=\"float:left;vertical-align:top;\">";
+
+    # show if TIMESTAMPDIFF(hour,now,arrival) > duration
+
+    # show general villages
+    print "<div>";
+    my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
+    $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
+    $sql1 .= " l.user player, l.village,";
+    $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
+
+    my $checked = "checked"; # use $fakeuser table
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, ' $checked>') chk ";
+    $sql2 .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+
+    my $sql3  = " where l.aid = 22 ";
+    $sql3 .= " and (TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) ) ";
+
+    $sql3 .= " order by duration desc";
+    $sql3 .= " limit 20;";
+
+    $sth = do_sql($db, $sql1 . $sql2 . $sql3);
+    show_data_table($sth);
+    print "</div>";
+
+    print "<hr>";
+
+    # show artifact villages
+    print "<div>";
+    $checked = "checked"; # used $fakevil table
+    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, \" $checked>\") chk ";
+    $sql2a .= " from art a join last l on a.x = l.x and a.y = l.y ";
+
+    $sth = do_sql($db, $sql1.$sql2a.$sql3);
+    show_data_table($sth);
+
+    print "</div>";    # end of artifact
+    print "</div>\n";  # end of left
+
     print "</form>\n";
 
-    print "</div>\n";
-
-    # right
-    print "<div class=fr>";
-
-    # $sql  = "select start, hours4() duration, dist($x,$y,x,y) dist, arrival, gridlink(x,y), user, village, checkbox ";
-    # $sql  = "select travel(dist($x,$y,x,y), $vel, $tsq) duration, dist($x,$y,x,y) dist, $arrival, gridlink(x,y), user, village,";
-    $sql  = "select travel(dist($x,$y,x,y), $vel, $tsq) duration, dist($x,$y,x,y) d, \'$arrival\', gridlink(x,y), user, village,";
-    $sql .= " concat('<input type=checkbox name=village value=', vid, '>') chk ";
-    $sql .= " from last l where aid = 22 limit 10;";
-
-    $sth = do_sql($db, $sql);
-    show_data_table($sth);
-    
-    print "</div>\n";
     # bottom
-    print "<div class=fc>";
+    print "<div style=\"clear: both;\">";
     print "</div>\n";
 
     close_db($db);

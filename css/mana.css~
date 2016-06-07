@@ -8,10 +8,6 @@ p       { line-height: 140%; }
 #header { background-color: #c0c0c0; }
 .copy   { color: #808080; }
 
-.fl     { float: left;  }
-.fr     { float: right; }
-.fc     { clear: both;  }
-
 /* table {background-color: #c0c0c0; } */
 
 
