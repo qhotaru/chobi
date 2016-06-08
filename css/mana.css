@@ -12,6 +12,18 @@ p       { line-height: 140%; }
 .fr     { float: right; }
 .fc     { clear: both;  }
 
+div.menupane {
+    float:left;
+    vertical-align: top;
+    width: 30%;
+}
+
+div.datapane {
+    float:left;
+    vertical-align: top;
+    width: 60%;
+}
+
 /* table {background-color: #c0c0c0; } */
 
 

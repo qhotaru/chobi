@@ -48,6 +48,7 @@ my %msg = (
     "set_arrival"   => "到着時刻登録",
     "set_player"    => "プレイヤー登録",
     "set_village"   => "村登録",
+    "set_grid"      => "送付元登録",
     );
 
 foreach my $ee (keys %msg){
@@ -58,14 +59,12 @@ foreach my $ee (keys %msg){
 my $fakenow    = "fakenow";
 my $fakeplayer = "fakeplayer";
 my $fakevil    = "fakevil";
-my $fakeart    = "fakeart";
 #
 # 
 my %faketables = (
     $fakenow    => "create table fakenow    (id serial, fid int, rev int, arrival datetime, note varchar(256), ts timestamp );",
     $fakeplayer => "create table fakeplayer (id serial, fs int, uid int, enabled int, note varchar(64), ts timestamp);",
     $fakevil    => "create table fakevil    (id serial, fs int, vid int, enabled int, note varchar(64), ts timestamp);",
-    $fakeart    => "create table fakeart    (id serial, fs int, vid int, enabled int, note varchar(64), ts timestamp);",
     );
 
 my $g_cookie;
@@ -198,7 +197,7 @@ sub usage {
 sub get_menu_item {
     my($name,$link) = @_;
 
-    my $str = "<a href=\"/$cpath$prog/$link\">$name</a>\n";
+    my $str = "<a href=\"$script/$link\">$name</a>\n";
     return $str;
 }
 
@@ -209,7 +208,7 @@ sub get_menu_item1 {
     if( $link =~ /^http/ ){
 	$str = "<a href=\"$link\">$name</a>\n";
     } else {
-	$str = "<a href=\"/$cpath$prog/$link\">$name</a>\n";
+	$str = "<a href=\"/$script/$link\">$name</a>\n";
     }
     return $str;
 }
@@ -298,7 +297,6 @@ sub show_script {
        xhr.send();
     } // function village_change()
 
-
     function update_player(text){
 	document.loc.player.innerHTML = text;
     }
@@ -351,8 +349,6 @@ sub auth {
     # }
     my $ck;
 
-    # show_head();
-    # if( !defined($force) && !$force && exists $cookies{"narusaid"} ){
     if( exists $cookies{"narusaid"} ){
 	$ck = $cookies{"narusaid"};
 	if( defined($ck) ){
@@ -363,16 +359,9 @@ sub auth {
 		return 0
 	    }
 	}
-	# print "failed 1\n";
     }
-    # print "failed 2\n";
 
     # not authed before
-
-    # show_head("DBG: not authenticated before.");
-    # print "---",$ck;
-    # print "---";
-    
     my $auth = $cgi->param("auth");
     if( !defined($auth) ){
 	# not from auth page
@@ -498,8 +487,6 @@ sub show_head {
   print " -- ";
   print "||";
   print get_menu_item("login","login");
-  print "||";
-  print " -- ";
 
   my $msg = encode('utf-8', "他サイト");
     
@@ -840,7 +827,7 @@ sub insert_data {
 
     my $db = open_db();
 
-    print "insert_data with cont=$continue\n";
+    # print "DBG: insert_data with cont=$continue\n";
     
     # for first (none, 0, 1)
     if( !defined($continue) || !$continue || $continue == 1){
@@ -1294,13 +1281,14 @@ sub show_fakenow {
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
 
+    #
     # Top div
+    #
     print "<div>";
 
     print "<table border=0>";
     print "<tr>";
     print "<td>FakeID/Rev</td><td>$id/$rev</td>";
-    # print "<td>Arrival</td><td><input type=text name=arrival value=\"$arrival\"></td>";
     print "<td>Arrival</td><td>$arrival</td>";
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
@@ -1318,9 +1306,10 @@ sub show_fakenow {
 
     
     # print "<div style=\"clear:both;\"></div>\n";
-    
+
+    #
     # left div
-    # print "<div class=fl>";
+    #
 
     print "<div style=\"float:left;\">";
     # players list
@@ -1331,14 +1320,15 @@ sub show_fakenow {
 
     print "</div>\n";
 
-    print "<div style=\"float:left;width=10px;\"></div>";
-    
+    print "<div style=\"float:left;width=20px;\"></div>";
+
+    #
     # right div
+    #
     print "<div style=\"float:left;vertical-align:top;\">";
-
-    # show if TIMESTAMPDIFF(hour,now,arrival) > duration
-
+    #
     # show general villages
+    #
     print "<div>";
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
@@ -1361,7 +1351,9 @@ sub show_fakenow {
 
     print "<hr>";
 
+    # 
     # show artifact villages
+    #
     print "<div>";
     $checked = "checked"; # used $fakevil table
     my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, \" $checked>\") chk ";
@@ -1371,13 +1363,12 @@ sub show_fakenow {
     show_data_table($sth);
 
     print "</div>";    # end of artifact
-    print "</div>\n";  # end of left
+    print "</div>\n";  # end of right table
 
     print "</form>\n";
 
     # bottom
-    print "<div style=\"clear: both;\">";
-    print "</div>\n";
+    print "<div style=\"clear: both;\"></div>";
 }
 
 
@@ -2404,7 +2395,7 @@ sub do_snip {
 sub exec_fakelist {
     my($db, $x,$y,$vel,$tsq) = @_;
 
-    init_fakenow($db);
+    # init_fakenow($db);
 
     my $cgi     = CGI->new();
     
@@ -2415,38 +2406,41 @@ sub exec_fakelist {
     my $carrival = $cgi->param("arrival");
 
     if( defined($exec) ){
-	print "exec ";
+	# print "exec ";
 	if( $exec eq $msg{set_arrival} ){
 	    # set arrival
-	    print "-- set arrival -- $cid, $cfid, $crev, $carrival ";
+	    # print "-- set arrival -- $cid, $cfid, $crev, $carrival ";
 
 	    my $ret = $db->do("update $fakenow set arrival = \"$carrival\" where id=$cid;");
 	} elsif( $exec eq $msg{set_player} ){
 	    # set player
 	    my @players = $cgi->param("player");
 	    my $playlist = join(",", @players);
-	    print "-- set player -- $cid, $cfid, $crev, $carrival ";
-	    print "... $playlist ";
+	    # print "-- set player -- $cid, $cfid, $crev, $carrival ";
+	    # print "... $playlist ";
 	    $db->do("delete from $fakeplayer where fs = $cid;");
 	    foreach my $uid (@players){
-		print "inserting ($cid,$uid) ";
+		# print "inserting ($cid,$uid) ";
 		my $num = $db->do("insert into $fakeplayer (fs,uid) values ($cid, $uid);");
 		# print "DBG: $num inserted into $fakeplayer\n";
 	    }
 	} elsif( $exec eq $msg{set_village} ){
 	    # set village but no rev up.
-	    print "-- set vil -- $cid, $cfid, $crev, $carrival ";
 	    my @vils = $cgi->param("village");
+	    # print "exec -- set vil -- $cid, $cfid, $crev, $carrival -- ", join(",",@vils), "\n";
+	    $db->do("delete from $fakevil where fs = $cid;");
 	    foreach my $vid (@vils){
-		$db->do("insert into $fakevil (fs,vid) vlaues ($cid, $vid);");
+		my $sql = "insert into $fakevil (fs,vid) values ( $cid, $vid );";
+		# print "-- $cid, $vid\n";
+		$db->do($sql);
 	    }
 	} elsif( $exec eq $msg{fix} ){
 	    # set fix mark
-	    print "-- fix -- $cid, $cfid, $crev, $carrival ";
+	    # print "-- fix -- $cid, $cfid, $crev, $carrival ";
 	    $db-do("update $fakenow set fix = 1 where id = $cid;");
 	} elsif( $exec eq $msg{save} ){
 	    # rev up
-	    print "-- save -- $cid, $cfid, $crev, $carrival ";
+	    # print "-- save -- $cid, $cfid, $crev, $carrival ";
 	    # insert new fake rev
 	    my $newrev = $crev + 1;
 	    $db->do("insert into $fakenow (fid,rev) values ($cfid,$newrev);");
@@ -2459,11 +2453,9 @@ sub exec_fakelist {
 	    # copy from previous revision
 	    $db->do("insert into $fakeplayer (fs,uid) as select $fs, uid from $fakeplayer where fs = $cid" );
 	    $db->do("insert into $fakevil    (fs,vid) as select $fs, vid from $fakevil    where fs = $cid" );
-	    $db->do("insert into $fakeart    (fs,vid) as select $fs, vid from $fakeart    where fs = $cid" );
 
 	} elsif( $exec eq $msg{new} ){
 	    # new fakeset
-	    print "-- new -- $cid, $cfid, $crev, $carrival ";
 	    my $nextfid = $cfid + 1;
 	    my $ret = $db->do("insert into $fakenow (fid,rev,arrival) values ($nextfid, 0, \"$carrival\");");
 	}
@@ -2477,7 +2469,7 @@ sub show_fakelist {
 
     init_fakenow($db);
 
-    print "<form method=post action=/$script/fakelist/exec>\n";
+    print "<form method=post action=\"/$script/fakelist/exec\">\n";
 
     my $sql = "select id, fid, rev, arrival, fixed from $fakenow order by id desc limit 1;";
     my ($id, $fid, $rev, $arrival, $fixed) = $db->selectrow_array($sql);
@@ -2486,6 +2478,7 @@ sub show_fakelist {
 	$id = 0; $fid = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
+
     print "<input type=hidden name=id value=$id>\n";
     print "<input type=hidden name=fid value=$fid>\n";
     print "<input type=hidden name=rev value=$rev>\n";
@@ -2499,20 +2492,21 @@ sub show_fakelist {
     print "<td>FakeID/Rev</td><td>$fid/$rev ($id)</td>";
 
     print "<td>Arrival</td><td><input type=text name=arrival value=\"$arrival\"></td>";
-    print "<input type=submit name=exec value=$msg{set_arrival}>";
+    print "<td><input type=submit name=exec value=\"$msg{set_arrival}\"></td>>";
 
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
     print "<td>VEL</td><td><input type=text size=5 name=vel value=$vel></td>";
     print "<td>TSQ</td><td><input type=text size=5 name=tsq value=$tsq></td>";
+    print "<td><input type=submit name=exec value=\"$msg{set_grid}\"></td>";
 
     print "</tr>";
     print "</table>";
 
     print "<p>";
-    print "<input type=submit name=exec value=$msg{new}>";
-    print "<input type=submit name=exec value=$msg{save}>";
-    print "<input type=submit name=exec value=$msg{fix}>";
+    print "<input type=submit name=exec value=\"$msg{new}\">";
+    print "<input type=submit name=exec value=\"$msg{save}\">";
+    print "<input type=submit name=exec value=\"$msg{fix}\">";
     print "</p>";
 
     print "</div>";
@@ -2522,10 +2516,10 @@ sub show_fakelist {
     #
     print "<div style=\"float:left;vertical-align:top;\">";
     # button
-    print "<input type=submit name=exec value=$msg{set_player}>";
+    print "<p><input type=submit name=exec value=\"$msg{set_player}\"></p>";
     # players list
     # username, checkbox
-    $sql = "select l.user, concat('<input type=checkbox name=player value=', l.uid, ' ', case p.enabled when 1 then 'checked' else '' end, '>') chk from last l left outer join $fakeplayer p on l.uid = p.uid and p.fs = $id where l.aid = 22 group by l.uid order by sum(l.population) desc;";
+    $sql = "select l.user, concat('<input type=checkbox name=player value=', l.uid, case p.enabled when 1 then ' checked' else '' end, '>') chk from last l left outer join $fakeplayer p on l.uid = p.uid and p.fs = $id where l.aid = 22 group by l.uid order by sum(l.population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
 
@@ -2541,7 +2535,7 @@ sub show_fakelist {
     #
     print "<div style=\"float:left;vertical-align:top;\">";
 
-    print "<input type=submit name=exec value=$msg{set_village}>";
+    print "<p><input type=submit name=exec value=\"$msg{set_village}\"></p>";
 
     # show villages
     #   conditions:  uid in $fakeplayer  or  vid in $fakevil
@@ -2553,27 +2547,18 @@ sub show_fakelist {
     $sql1 .= " l.user player, l.village,";
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
 
-    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end) chk ";
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>') chk ";
     $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil    v on v.vid = l.vid and v.fs = $id ";
     $sql2    .= "   left outer join $fakeplayer u on u.uid = l.uid and u.fs = $id ";
 
     my $sql3  = " where l.aid = 22 ";
        $sql3 .= " and ( (u.uid is not null ) or (v.vid is not null) )";
+       $sql3 .= " group by l.vid ";
        $sql3 .= " order by l.uid, duration asc ;";
 
     $sth = do_sql($db, $sql1 . $sql2 . $sql3);
 
-    my $q1   = "select gridlink(l.x,l.y), l.user player, l.village ";
-    my $q2  .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
-       $q2  .= "   left outer join $fakevil    v on v.vid = l.vid ";
-#       $q2  .= "   left outer join $fakeplayer u on u.uid = l.uid and u.fs = $id ";
-    my $q3  = " where l.aid = 22 ";
-    # $q3 .= " and ( (u.uid is not null ) or (v.vid is not null) )";
-       $q3 .= " order by l.uid limit 20;";
-    
-    # $sth = do_sql($db, $q1 . $q2 . $q3);
-    
     show_data_table($sth);
     print "</div>";
 
@@ -2582,11 +2567,12 @@ sub show_fakelist {
     # show artifact villages
     print "<div>";
 
-    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then 'checked' else '' end ) chk ";
+    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>' ) chk ";
     $sql2a    .= " from art a join last l on a.x = l.x and a.y = l.y ";
     $sql2a    .= " left outer join $fakevil v on v.vid = l.vid ";
 
     my $sql3a  = " where l.aid = 22 ";
+       $sql3a .= " group by l.vid ";
     $sql3a    .= " order by l.uid, duration ;";
 
     $sth = do_sql($db, $sql1.$sql2a.$sql3a);
@@ -2638,7 +2624,7 @@ my $lp;
 my $info = "";
 my $inline = 0;
 
-my($x,$y,$vel, $tsq) = (0,0,5,20);
+my($x,$y,$vel, $tsq) = (0,0,3,20);
 
 if ( $#ARGV < 0 ) {
     # Auth
@@ -2659,7 +2645,7 @@ if ( $#ARGV < 0 ) {
 
     $x = 0    if (!defined($x)); 
     $y = 0    if (!defined($y)); 
-    $vel = 5  if (!defined($vel));
+    $vel = 3  if (!defined($vel));
     $tsq = 20 if (!defined($tsq));
 
 } else {
