@@ -34,6 +34,7 @@ use Time::Local;
 #
 # Globals
 #
+my $g_login_title = encode('utf-8', "<h1> Login : みんなの交通安全</h1>");   # external code
 my $g_login;
 
 my %msg = (
@@ -334,38 +335,47 @@ EOT
 ;
 }
 
+# auth
+#   called from 
+#     1. head of main  => cookie = ok => follow through, ng => authpage
+#     2. Authpage      => cookie = ok => normal page, ng & pass match => normal page, ng & pass failed => Authpage
+	   
 sub auth {
-    my ($force) = @_;
+    # my ($force) = @_;
 
     my $cgi = CGI->new();
 
     my %cookies = CGI::Cookie->fetch;
     # for (keys %cookies) {
-	# do_something($cookies{$_});
-    #}
+    #   do_something($cookies{$_}); 
+    # }
     my $ck;
 
     # show_head();
+    # if( !defined($force) && !$force && exists $cookies{"narusaid"} ){
     if( exists $cookies{"narusaid"} ){
 	$ck = $cookies{"narusaid"};
 	if( defined($ck) ){
-	    my($g_login,$mark) = $ck->value;
+	    my($login,$mark) = $ck->value;
 	    #	    print join(",", @vals), "\n";
-	    return 0 if ($mark eq "narusa");
+	    if ($mark eq "narusa" && defined($login) && $login ne "" ){
+		$g_login = $login;
+		return 0
+	    }
 	}
 	# print "failed 1\n";
     }
     # print "failed 2\n";
 
-    # not authed
+    # not authed before
 
-    show_head("DBG: not authed.");
-    print "---",$ck;
-    print "---";
+    # show_head("DBG: not authenticated before.");
+    # print "---",$ck;
+    # print "---";
     
     my $auth = $cgi->param("auth");
     if( !defined($auth) ){
-	# not from login
+	# not from auth page
 	my $c = CGI::Cookie->new(-name    =>  'narusaid',
 				 -value   =>  ["login","failed"],
 				 -expires =>  '+1M');
@@ -373,27 +383,30 @@ sub auth {
 	show_auth_dialog();
 	exit 0;
     }
-    # from login
-    my $id = $cgi->param("id");
-    my $pw = $cgi->param("pw");
-    if( !pass_auth($id,$pw) ){
+    # from auth page
+    my $login = $cgi->param("login");
+    my $pw    = $cgi->param("pw");
+    if( !pass_auth($login,$pw) ){
 	# failed auth
 	show_auth_dialog();
 	exit 0;
     } else {
 	# passed auth
 	my $c = CGI::Cookie->new(-name    =>  'narusaid',
-				 -value   =>  [$id,"narusa"],
+				 -value   =>  [$login,"narusa"],
 				 -expires =>  '+1M');
 	$g_cookie = $c;
+	$g_login  = $login;
     }
+    return 0;
 }
 
 sub pass_auth {
-    my($id,$pw) = @_;
+    my($login,$pw) = @_;
 
     # if ( $id eq "kuma" && $pw eq "hangeki" ){
-    if ( $pw eq "hangeki" ){
+    if ( defined($login) && $login ne "" && $pw eq "hangeki" ){
+	$g_login = $login;
 	return 1;
     }
     return 0;
@@ -403,7 +416,14 @@ sub show_auth_dialog {
 
     my $title = "Kotsu Anzen";
 
+    my $c = CGI::Cookie->new(-name    =>  'narusaid',
+			     -value   =>  ["failed","failed"],
+			     -expires =>  '+1M');
+
     # http header
+    # clear cookie
+    print "Set-Cookie: $c\n";
+
     print "Content-type:text/html; charset=utf-8\n\n";
 
     # HTML head
@@ -414,14 +434,13 @@ sub show_auth_dialog {
     print '</head>';
 
     # HTML body
-    print '<body>';
-    print "\n";
+    print "<body>\n";
 
-    print "<h1> Login : みんなの交通安全</h1>";
+    print $g_login_title;
     
     # login form
-    print "<form method=post action=\"/$cpath$prog\"/>";
-    print "<p>ID: <input type=text size=16 name=id placeholder=id></p>";
+    print "<form method=post action=\"/$script\"/>";
+    print "<p>ID: <input type=text size=16 name=login placeholder=id></p>";
     print "<p>PW: <input type=password size=16 name=pw placeholder=password></p>";
     print "<input type=hidden name=auth value=new></p>";
     print "<input type=submit name=Login>";
@@ -440,7 +459,7 @@ sub show_head {
     if( defined($intitle) ){
 	$title = $intitle;
     }
-    $title = encode('utf-8', $title);
+    $title = encode('utf-8', $title); # for output
 
     #
     # show head
@@ -464,9 +483,7 @@ sub show_head {
 
   show_script();
   
-  print "||$g_login";
-  print "||";
-  print get_menu_item("login","login");
+  print "-- $g_login --";
   print "||";
   print get_menu_item("show","show");
   print "||";
@@ -478,7 +495,11 @@ sub show_head {
   print "||";
   print get_menu_item("fakelist","fakelist");
   print "||";
+  print " -- ";
+  print "||";
   print get_menu_item("login","login");
+  print "||";
+  print " -- ";
 
   my $msg = encode('utf-8', "他サイト");
     
@@ -923,7 +944,7 @@ sub show_form {
     my($x,$y,$tsq,$vel) = @_;
 
 #    print "送付元：";
-    print "<form name=pos method=post action=/$cpath$prog/show>\n";
+    print "<form name=pos method=post action=/$script/show>\n";
 
     print "x: <input type=text size=5 name=x value=$x>\n";
     print "y: <input type=text size=5 name=y value=$y>\n";
@@ -954,7 +975,7 @@ sub show_form_sel {
     $sth->finish;
 
     print "送付元：";
-    print "<form name=loc method=post action=/$cpath$prog/show>\n";
+    print "<form name=loc method=post action=/$script/show>\n";
 
     print "<select name=ally onchange=ally_change()>\n";
 
@@ -1247,7 +1268,7 @@ sub reinit_tables {
 	my $sql = "select 1 from $name";
 	my $ret = $db->selectrow_array($sql);
 
-	print "DBG:reinit_tables: name=$name, ret=$ret\n";
+	# print "DBG:reinit_tables: name=$name, ret=$ret\n";
 
 	if( !defined($ret) ){
 	    # not exists
@@ -1448,7 +1469,7 @@ sub show_armlog {
 	    push @urls, $url;
 	}
     }
-#    print "DBG: Loading ", join("," , @urls), "\n";
+    # print "DBG: Loading ", join("," , @urls), "\n";
 
     if ( $#urls >= 0 ){
 	foreach my $url (@urls){
@@ -2198,7 +2219,7 @@ sub parse_report_root {
 	if(defined($day)){
 	    my $dayp = $day->as_text;
 	    $dayp =~ s/report.*$//;
-	    print "DBG: $dayp\n";
+	    # print "DBG: $dayp\n";
 	    push @days, $day;
 	}
 
@@ -2206,7 +2227,7 @@ sub parse_report_root {
     my @tables = $root->look_down(_tag => "table", class => "wojska_new");
 
     foreach my $tt (@tables){
-	print "DBG: new table\n";
+	# print "DBG: new table\n";
 	my $attacker = 0; # per <table>
 	my @trs = $tt->find("tr");
 
@@ -2410,7 +2431,7 @@ sub exec_fakelist {
 	    foreach my $uid (@players){
 		print "inserting ($cid,$uid) ";
 		my $num = $db->do("insert into $fakeplayer (fs,uid) values ($cid, $uid);");
-		print "DBG: $num inserted into $fakeplayer\n";
+		# print "DBG: $num inserted into $fakeplayer\n";
 	    }
 	} elsif( $exec eq $msg{set_village} ){
 	    # set village but no rev up.
@@ -2646,8 +2667,6 @@ if ( $#ARGV < 0 ) {
     $info = $ARGV[0];
 }
 
-
-
 if( $info =~ /show/ || $info eq "" ){
     show_head();
     show_info($x,$y,$tsq,$vel, 0);
@@ -2757,9 +2776,9 @@ if( $info =~ /show/ || $info eq "" ){
     close_db($db);
 
 } elsif ( $info =~ /login/ ){
-    # fake now
-    auth(1);
-
+    # login
+    show_auth_dialog();
+    exit 0;
 # others
 
 } elsif ( $ENV{"REQUEST_URI"} =~ /$cpath$prog/ ){
