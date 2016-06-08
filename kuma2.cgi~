@@ -1195,7 +1195,7 @@ sub show_fakenow {
     my $sql = "select id, rev, arrival from $fakenow order by id desc limit 1;";
     my ($id,$rev,$arrival) = $db->selectrow_array($sql);
 
-    if( !defeined($id) ){
+    if( !defined($id) ){
 	$id = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
@@ -1207,17 +1207,27 @@ sub show_fakenow {
     # username, checkbox
     print "<form method=post action=$script/fake/target>\n";
 
+    print "<p>";
     print "X: <input type=text size=5 name=x>";
+    print "</p>";
+    print "<p>";
     print "Y: <input type=text size=5 name=y>";
+    print "</p>";
+    print "<p>";
     print "VEL: <input type=text size=5 name=vel>";
+    print "</p>";
+    print "<p>";
     print "TSQ: <input type=text size=5 name=tsq>";
+    print "</p>";
 
+    print "<p>";
     print "<input type=submit name=exec value=reserve>";
     print "<input type=submit name=exec value=gone>";
     print "<input type=submit name=exec value=recommend>";
     print "<input type=submit name=exec value=next>";
+    print "</p>";
     
-    $sql = "select user, concat('<input type=checkbox name=player value=', uid, '>') from last l where aid = 22;";
+    $sql = "select user, concat('<input type=checkbox name=player value=', uid, '>') chk from last l where aid = 22 group by uid;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
     print "</form>\n";
@@ -1228,8 +1238,9 @@ sub show_fakenow {
     print "<div class=fr>";
 
     # $sql  = "select start, hours4() duration, dist($x,$y,x,y) dist, arrival, gridlink(x,y), user, village, checkbox ";
-    $sql  = "select travel(dist($x,$y,x,y), $vel, $tsq) duration, dist($x,$y,x,y) dist, $arrival, gridlink(x,y), user, village,";
-    $sql  = " concat('<input type=checkbox name=village value=', vid, '>') ";
+    # $sql  = "select travel(dist($x,$y,x,y), $vel, $tsq) duration, dist($x,$y,x,y) dist, $arrival, gridlink(x,y), user, village,";
+    $sql  = "select travel(dist($x,$y,x,y), $vel, $tsq) duration, dist($x,$y,x,y) d, \'$arrival\', gridlink(x,y), user, village,";
+    $sql .= " concat('<input type=checkbox name=village value=', vid, '>') chk ";
     $sql .= " from last l where aid = 22 limit 10;";
 
     $sth = do_sql($db, $sql);
