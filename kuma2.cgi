@@ -40,6 +40,7 @@ my $g_login;
 my %msg = (
     "reserve"   => "予約",
     "fired"     => "発射済",
+    "clear"     => "Cancel",
     "new"       => "新規",
     "recommend" => "推奨",
     "save"      => "保存",
@@ -62,9 +63,9 @@ my $fakevil    = "fakevil";
 #
 # 
 my %faketables = (
-    $fakenow    => "create table fakenow    (id serial, fid int, rev int, arrival datetime, note varchar(256), ts timestamp );",
-    $fakeplayer => "create table fakeplayer (id serial, fs int, uid int, enabled int, note varchar(64), ts timestamp);",
-    $fakevil    => "create table fakevil    (id serial, fs int, vid int, enabled int, resv varchar(64), fired varchar(64), note varchar(64), ts timestamp);",
+    $fakenow    => "create table fakenow    (id serial, fid int, rev int, arrival datetime, note varchar(256), ts timestamp, unique (fid,rev)) );",
+    $fakeplayer => "create table fakeplayer (id serial, fs int, uid int, enabled int, note varchar(64), ts timestamp, unique (fs,uid) );",
+    $fakevil    => "create table fakevil    (id serial, fs int, vid int, enabled int, reserved varchar(64), fired varchar(64), note varchar(64), ts timestamp, unique(fs,vid) );",
     );
 
 my $g_cookie;
@@ -1224,15 +1225,19 @@ sub dnormal {
 #
 
 #
-# Functions
+# Functions for fakelist
 #
-# 1. view
-# 2. Set target arrival
-# 3. reserve
-# 4. fired
-# 5. fix
-# 6. recommend
+# 1. Set target arrival
+# 2. Set Source
+# 3. Set players
+# 4. Set village
+# 5. fix  : set fixed mark
+# 6. next : create next fakelist
 #
+# Functions for fakenow
+#
+# a. reserve
+# b. fired
 #
 # fakenow table
 #   create table fakenow (id serial, rev int, arrival datetime, note varchar(256) );
@@ -1265,6 +1270,88 @@ sub reinit_tables {
     return $ret;
 }
 
+sub update_or_insert_fakevil {
+    my($db,$fs,$resv,$fired, @vils) = @_;
+
+    my $ret = 0;
+    # insert will fail when row exists because of (fs,vid) unique constraint
+    foreach my $vid (@vils){
+	my $sql = "insert into $fakevil (fs,vid,reserved,fired) values ($fs,$vid,\"$resv\",\"$fired\");";
+
+	print "DBG; insert: $sql\n";
+	$ret = $db->do($sql);
+    }
+
+    $resv  = "null" if( !defined($resv)  || $resv eq "" );
+    $fired = "null" if( !defined($fired) || $fired eq "" );
+
+    my $vlist = join(",", @vils);
+    
+    my $updr = "update $fakevil set reserved = \"$resv\" where fs = $fs and vid in ($vlist);";
+    my $updf = "update $fakevil set fired = \"$fired\" where fs = $fs and vid in ($vlist);";
+    my $updb = "update $fakevil set reserved = null, fired = null where fs = $fs and vid in ($vlist);";
+    
+    # anyway try to update.
+    my $upd;
+    if( $resv ne "null" ) {
+	# update reserved
+	$upd = $updr;
+    } elsif( $fired ne "null" ) {
+	# update fired
+	$upd = $updf;
+    } else {
+	# clear
+	$upd = $updb;
+    }
+    print "DBG: update: $upd\n";
+    $ret = $db->do($upd);
+
+    return $ret;
+}
+
+sub exec_fakenow {
+    my($db, $x,$y,$vel,$tsq) = @_;
+
+    my $cgi      = CGI->new();
+
+    my $exec     = $cgi->param("exec");
+
+    my $cid      = $cgi->param("id");
+    my $cfid     = $cgi->param("fid");
+    my $crev     = $cgi->param("rev");
+
+    my $username = $g_login;
+    $username = "unknown" if( $g_login eq "");
+
+    my $ret = 0;
+
+    if( defined($exec) ){
+	# print "exec ";
+	if( $exec eq $msg{"reserve"} ){
+	    # reserve
+	    print "-- reserve -- cid:$cid, cfid:$cfid, crev:$crev, login:$g_login ";
+	    my @vils = $cgi->param("village");
+
+	    $ret = update_or_insert_fakevil($db, $cid, $username, "", @vils);
+	} elsif( $exec eq $msg{"fired"} ){
+	    # fire
+	    print "-- fire -- $cid, $cfid, $crev ";
+
+	    my @vils = $cgi->param("village");
+	    $ret = update_or_insert_fakevil($db, $cid, "", $username, @vils);
+
+	} elsif( $exec eq $msg{"clear"} ){
+	    # clear
+	    print "-- clear -- $cid, $cfid, $crev ";
+
+	    my @vils = $cgi->param("village");
+	    $ret = update_or_insert_fakevil($db, $cid, "", "", @vils);
+	}
+    }
+
+    return show_fakenow($db,$x,$y,$vel,$tsq);
+}
+
 
 sub show_fakenow {
     my($db, $x,$y,$vel,$tsq) = @_;
@@ -1273,14 +1360,13 @@ sub show_fakenow {
 
     print "<form method=post action=/$script/fakenow/exec>\n";
 
-    my $sql = "select fid, rev, arrival from $fakenow where fixed > 0 order by fid desc, rev desc limit 1;";
-    my ($id,$rev,$arrival) = $db->selectrow_array($sql);
+    my $sql = "select id, fid, rev, arrival from $fakenow where fixed > 0 order by fid desc, rev desc limit 1;";
+    my ($id,$fid,$rev,$arrival) = $db->selectrow_array($sql);
 
     if( !defined($id) ){
 	$id = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
-
     #
     # Top div
     #
@@ -1288,8 +1374,8 @@ sub show_fakenow {
 
     print "<table border=0>";
     print "<tr>";
-    print "<td>FakeID/Rev</td><td>$id/$rev</td>";
-    print "<td>Arrival</td><td>$arrival</td>";
+    print "<td>FakeID/Rev</td><td>$fid/$rev ($id)</td>";
+    print "<td>Arrival</td><td><b color=red>$arrival</b></td>";
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
     print "<td>VEL</td><td><input type=text size=5 name=vel value=$vel></td>";
@@ -1300,7 +1386,12 @@ sub show_fakenow {
     print "<p>";
     print "<input type=submit name=exec value=$msg{reserve}>";
     print "<input type=submit name=exec value=$msg{fired}>";
+    print "<input type=submit name=exec value=$msg{clear}>";
     print "</p>";
+
+    print "<input type=hidden name=id value=$id>\n";
+    print "<input type=hidden name=fid value=$fid>\n";
+    print "<input type=hidden name=rev value=$rev>\n";
 
     print "</div>";
 
@@ -1334,18 +1425,23 @@ sub show_fakenow {
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,";
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
+    $sql1 .= " f.reserved, f.fired, ";
 
-    my $checked = "checked"; # use $fakeplayer table
-    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, ' $checked>') chk ";
-    $sql2 .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+    # my $checked = "checked"; # use $fakeplayer table
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
+    $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= "   left outer join $fakevil f on f.vid = l.vid ";
 
     my $sql3  = " where l.aid = 22 ";
-    $sql3 .= " and (TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) ) ";
+    $sql3    .= " and ( (TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) ) ";
+    $sql3    .= "       or ( f.enabled > 0 ) )";
 
     $sql3 .= " order by duration desc";
     $sql3 .= " limit 20;";
 
-    $sth = do_sql($db, $sql1 . $sql2 . $sql3);
+    my $sqlvil = $sql1 . $sql2 . $sql3;
+    # print "$sqlvil\n";
+    $sth = do_sql($db, $sqlvil);
     show_data_table($sth);
     print "</div>";
 
@@ -1355,11 +1451,15 @@ sub show_fakenow {
     # show artifact villages
     #
     print "<div>";
-    $checked = "checked"; # used $fakevil table
-    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, \" $checked>\") chk ";
-    $sql2a .= " from art a join last l on a.x = l.x and a.y = l.y ";
 
-    $sth = do_sql($db, $sql1.$sql2a.$sql3);
+    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
+    $sql2a .= " from art a join last l on a.x = l.x and a.y = l.y ";
+    $sql2a .= "   left outer join $fakevil f on f.vid = l.vid ";
+
+    my $sqlart = $sql1.$sql2a.$sql3;
+    # print "$sqlart\n";
+
+    $sth = do_sql($db, $sqlart);
     show_data_table($sth);
 
     print "</div>";    # end of artifact
@@ -2742,6 +2842,12 @@ if( $info =~ /show/ || $info eq "" ){
     # parse armlog and register
     show_head("Attacker log");
     show_armlog();
+} elsif ( $info =~ /fakenow\/exec/ ){
+    # exec fake now
+    show_head("Fake now");
+    my $db = open_db();
+    exec_fakenow($db, $x,$y,$vel,$tsq);
+    close_db($db);
 } elsif ( $info =~ /fakenow/ ){
     # fake now
     show_head("Fake now");
@@ -2750,7 +2856,7 @@ if( $info =~ /show/ || $info eq "" ){
     close_db($db);
 
 } elsif ( $info =~ /fakelist\/exec/ ){
-    show_head("Edit fakelist");
+    show_head("Fakelist");
     my $db = open_db();
     exec_fakelist($db, $x,$y,$vel,$tsq);
     close_db($db);
