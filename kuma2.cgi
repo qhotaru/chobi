@@ -64,7 +64,7 @@ my $fakevil    = "fakevil";
 my %faketables = (
     $fakenow    => "create table fakenow    (id serial, fid int, rev int, arrival datetime, note varchar(256), ts timestamp );",
     $fakeplayer => "create table fakeplayer (id serial, fs int, uid int, enabled int, note varchar(64), ts timestamp);",
-    $fakevil    => "create table fakevil    (id serial, fs int, vid int, enabled int, note varchar(64), ts timestamp);",
+    $fakevil    => "create table fakevil    (id serial, fs int, vid int, enabled int, resv varchar(64), fired varchar(64), note varchar(64), ts timestamp);",
     );
 
 my $g_cookie;
@@ -197,7 +197,7 @@ sub usage {
 sub get_menu_item {
     my($name,$link) = @_;
 
-    my $str = "<a href=\"$script/$link\">$name</a>\n";
+    my $str = "<a href=\"/$script/$link\">$name</a>\n";
     return $str;
 }
 
@@ -2395,7 +2395,7 @@ sub do_snip {
 sub exec_fakelist {
     my($db, $x,$y,$vel,$tsq) = @_;
 
-    # init_fakenow($db);
+    init_fakenow($db);
 
     my $cgi     = CGI->new();
     
@@ -2492,7 +2492,7 @@ sub show_fakelist {
     print "<td>FakeID/Rev</td><td>$fid/$rev ($id)</td>";
 
     print "<td>Arrival</td><td><input type=text name=arrival value=\"$arrival\"></td>";
-    print "<td><input type=submit name=exec value=\"$msg{set_arrival}\"></td>>";
+    print "<td><input type=submit name=exec value=\"$msg{set_arrival}\"></td>";
 
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
