@@ -74,7 +74,7 @@ sub show_head {
   print "| <a href=\"/$prog/menu\">menu</a> ";
   print "| <a href=\"/$prog/query\">query</a>";
   print "| <a href=\"/$prog/map\">map</a> ";
-  print "| <a href=\"/$prog/load\">load_map</a> ";
+  print "| <a href=\"/$prog/load\">load</a> ";
   print "| <a href=\"/$prog/load_force\">force to load</a> ";
   print "| <a href=\"/kuma.cgi\">narusa</a>";
   print "| <a href=\"/$prog$info\">reload</a>";

@@ -495,7 +495,7 @@ sub show_head {
   print get_menu_item1("narusa","http://153.126.160.254/defence");
   my $msg = encode('utf-8', "データロード");
   print "|| -- $msg -- ||";
-  print get_menu_item("load","load");
+  print get_menu_item("load_narusa","load");
 #  print get_menu_item("reinit","reinit");
 #  print "||";
 #  print get_menu_item("init","init");
@@ -832,7 +832,7 @@ sub insert_data {
     
     # for first (none, 0, 1)
     if( !defined($continue) || !$continue || $continue == 1){
-	print "truncating $sktable\n";
+	# print "truncating $sktable\n";
 	do_sql($db, "truncate table $sktable;");
     }
     
@@ -947,11 +947,7 @@ sub show_form {
 sub show_form_sel {
     my($db,$x, $y, $vel,$tsq) = @_;
 
-    # ally
-    # player
-    # village
-    # vel, tsq
-
+    # ally, player, village, vel, tsq
     my($uid,$user,$vid, $village, $aid,$alliance) = (-1,"",-1,"",-1,"");
 
     my $sth = do_sql($db, "select x,y,uid,user,vid, village, aid,alliance from x_world where x = $x and y = $y;");
@@ -963,7 +959,7 @@ sub show_form_sel {
     $sth->finish;
 
     print "送付元：";
-    print "<form name=loc method=post action=/$script/show>\n";
+    print "<form style=\"float:left;\" name=loc method=post action=/$script/show>\n";
 
     print "<select name=ally onchange=ally_change()>\n";
 
@@ -1278,7 +1274,7 @@ sub update_or_insert_fakevil {
     foreach my $vid (@vils){
 	my $sql = "insert into $fakevil (fs,vid,reserved,fired) values ($fs,$vid,\"$resv\",\"$fired\");";
 
-	print "DBG; insert: $sql\n";
+	# print "DBG; insert: $sql\n";
 	$ret = $db->do($sql);
     }
 
@@ -1303,10 +1299,40 @@ sub update_or_insert_fakevil {
 	# clear
 	$upd = $updb;
     }
-    print "DBG: update: $upd\n";
+    # print "DBG: update: $upd\n";
     $ret = $db->do($upd);
 
     return $ret;
+}
+
+#
+#  Priority : cgi -> DB -> inpar
+#
+#  1. valid cgi x,y -> CGI
+#  2. else valid DB -> DB
+#  3. else inpara
+#
+
+sub get_location_by_login {
+    my($db, $cgi, $login, $x, $y) = @_;
+
+    my $cx = $cgi->param("x");
+    my $cy = $cgi->param("y");
+
+    if( defined($cx) && defined($cy) ){
+	return ($cx, $cy);
+    }
+
+    if( !defined($login) || $login eq "" || $login eq "unknown" ){
+	# print "DBG: fail 1 $login, $x, $y\n";
+	return ($x,$y);
+    }
+    my($ox,$oy) = $db->selectrow_array("select c.x, c.y from capital c join last l on c.x = l.x and c.y = l.y where l.user = \"$login\";");
+    if( !defined($x) || !defined($y) ){
+	# print "DBG: fail 2 $login, $ox, $oy, $x, $y\n";
+	return ($x,$y);
+    }
+    return ($ox,$oy);
 }
 
 sub exec_fakenow {
@@ -1314,11 +1340,7 @@ sub exec_fakenow {
 
     my $cgi      = CGI->new();
 
-    my $exec     = $cgi->param("exec");
-
-    my $cid      = $cgi->param("id");
-    my $cfid     = $cgi->param("fid");
-    my $crev     = $cgi->param("rev");
+    my($exec,$cid,$cfid,$crev) = fakelist_get_cgi_param($cgi);
 
     my $username = $g_login;
     $username = "unknown" if( $g_login eq "");
@@ -1329,20 +1351,20 @@ sub exec_fakenow {
 	# print "exec ";
 	if( $exec eq $msg{"reserve"} ){
 	    # reserve
-	    print "-- reserve -- cid:$cid, cfid:$cfid, crev:$crev, login:$g_login ";
+	    # print "-- reserve -- cid:$cid, cfid:$cfid, crev:$crev, login:$g_login ";
 	    my @vils = $cgi->param("village");
 
 	    $ret = update_or_insert_fakevil($db, $cid, $username, "", @vils);
 	} elsif( $exec eq $msg{"fired"} ){
 	    # fire
-	    print "-- fire -- $cid, $cfid, $crev ";
+	    # print "-- fire -- $cid, $cfid, $crev ";
 
 	    my @vils = $cgi->param("village");
 	    $ret = update_or_insert_fakevil($db, $cid, "", $username, @vils);
 
 	} elsif( $exec eq $msg{"clear"} ){
 	    # clear
-	    print "-- clear -- $cid, $cfid, $crev ";
+	    # print "-- clear -- $cid, $cfid, $crev ";
 
 	    my @vils = $cgi->param("village");
 	    $ret = update_or_insert_fakevil($db, $cid, "", "", @vils);
@@ -1367,6 +1389,10 @@ sub show_fakenow {
 	$id = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
+
+    my $cgi = CGI->new();
+    ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
+
     #
     # Top div
     #
@@ -1374,7 +1400,7 @@ sub show_fakenow {
 
     print "<table border=0>";
     print "<tr>";
-    print "<td>FakeID/Rev</td><td>$fid/$rev ($id)</td>";
+    print "<td>Flight $fid</td><td>Rev. $rev (SN=$id)</td>";
     print "<td>Arrival</td><td><b color=red>$arrival</b></td>";
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
@@ -1421,16 +1447,17 @@ sub show_fakenow {
     # show general villages
     #
     print "<div>";
-    my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
+    my $sql1  = "select DATE_FORMAT(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ),'%c-%d %H:%i:%s') start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,";
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
     $sql1 .= " f.reserved, f.fired, ";
 
-    # my $checked = "checked"; # use $fakeplayer table
-    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
+    $sql2    .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late , ";
+    $sql2    .= " DATE_FORMAT(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second),'%c-%d %H:%i:%s') arrive ";
     $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
-    $sql2    .= "   left outer join $fakevil f on f.vid = l.vid ";
+    $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $sql3  = " where l.aid = 22 ";
     $sql3    .= " and ( (TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) ) ";
@@ -1442,6 +1469,7 @@ sub show_fakenow {
     my $sqlvil = $sql1 . $sql2 . $sql3;
     # print "$sqlvil\n";
     $sth = do_sql($db, $sqlvil);
+    print "<b>Villages on time and in fakelist. </b>";
     show_data_table($sth);
     print "</div>";
 
@@ -1452,23 +1480,84 @@ sub show_fakenow {
     #
     print "<div>";
 
-    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
+    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
+    $sql2a .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late, ";
+    $sql2a   .= " DATE_FORMAT(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second),'%c-%d %H:%i:%s') arrive ";
     $sql2a .= " from art a join last l on a.x = l.x and a.y = l.y ";
-    $sql2a .= "   left outer join $fakevil f on f.vid = l.vid ";
+    $sql2a .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $sqlart = $sql1.$sql2a.$sql3;
     # print "$sqlart\n";
 
     $sth = do_sql($db, $sqlart);
+    print "<b>Artifacts.</b>";
     show_data_table($sth);
-
     print "</div>";    # end of artifact
-    print "</div>\n";  # end of right table
 
+    print "<div>";
+    fakenow_show_capital($db, $x,$y,$vel,$tsq,$arrival,$id, "Capitals without artifact and not in fakelist.");
+    print "</div>";
+    
+    print "</div>\n";  # end of right table
     print "</form>\n";
 
     # bottom
     print "<div style=\"clear: both;\"></div>";
+}
+
+sub fakenow_show_capital {
+    my($db, $x,$y,$vel,$tsq, $arrival, $id, $title) = @_;
+
+    my $sql1  = "select df(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second )) start, ";
+    $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
+    $sql1 .= " usera(l.uid,l.user) player, l.village,";
+    $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
+    $sql1 .= " f.reserved, f.fired, ";
+
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
+
+    
+    $sql2    .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late , ";
+    $sql2    .= " df(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second)) arrive ";
+
+
+    $sql2    .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
+
+    my $sql3  = " where l.aid = 22 ";
+    $sql3    .= " and f.vid is null and a.x is null "; # not in fakelist neither artifact
+    $sql3 .= " order by duration desc";
+    $sql3 .= " limit 20;";
+
+    my $sqlvil = $sql1 . $sql2 . $sql3;
+    # print "$sqlvil\n";
+    my $sth = do_sql($db, $sqlvil);
+    print $title;
+    show_data_table($sth);
+}
+
+sub fakelist_show_capital {
+    my($db, $x,$y,$vel,$tsq, $arrival, $id, $title) = @_;
+
+    my $sql1  = "select df(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second )) start, ";
+    $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
+    $sql1 .= " usera(l.uid,l.user) player, l.village,";
+    $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
+
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
+    $sql2    .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
+
+    my $sql3  = " where l.aid = 22 ";
+    $sql3    .= " and f.vid is null and a.x is null "; # not in fakelist neither artifact
+    $sql3 .= " order by duration desc";
+    $sql3 .= " limit 20;";
+
+    my $sqlvil = $sql1 . $sql2 . $sql3;
+    # print "$sqlvil\n";
+    my $sth = do_sql($db, $sqlvil);
+    print $title;
+    show_data_table($sth);
 }
 
 
@@ -1716,9 +1805,13 @@ sub show_info {
 
     my $db = open_db();
 
+    my $cgi = CGI->new();
+    ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
+
     show_form_sel($db, $x, $y, $vel, $tsq);
     show_form_params($db, $x, $y, $vel, $tsq);
     show_form($x,$y,$tsq,$vel);
+
 
     register_srcdata($db, $x,$y,$tsq,$vel);
     my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
@@ -2497,14 +2590,11 @@ sub exec_fakelist {
 
     init_fakenow($db);
 
-    my $cgi     = CGI->new();
-    
-    my $exec     = $cgi->param("exec");
-    my $cid      = $cgi->param("id");
-    my $cfid     = $cgi->param("fid");
-    my $crev     = $cgi->param("rev");
-    my $carrival = $cgi->param("arrival");
+    my $cgi = CGI->new();
+    my ($exec,$cid,$cfid,$crev,$carrival) = fakelist_get_cgi_param($cgi);
 
+    my $ret = 0;
+    
     if( defined($exec) ){
 	# print "exec ";
 	if( $exec eq $msg{set_arrival} ){
@@ -2537,22 +2627,24 @@ sub exec_fakelist {
 	} elsif( $exec eq $msg{fix} ){
 	    # set fix mark
 	    # print "-- fix -- $cid, $cfid, $crev, $carrival ";
-	    $db-do("update $fakenow set fix = 1 where id = $cid;");
+	    $ret = $db->do("update $fakenow set fixed = 1 where id = $cid;");
+	    # print "DBG: fix = $ret , on id = $cid \n";
 	} elsif( $exec eq $msg{save} ){
 	    # rev up
 	    # print "-- save -- $cid, $cfid, $crev, $carrival ";
 	    # insert new fake rev
 	    my $newrev = $crev + 1;
-	    $db->do("insert into $fakenow (fid,rev) values ($cfid,$newrev);");
-	    my $sth = $db->do_sql("select id from $fakenow where fid = $cfid and rev = $newrev;");
+	    my $ret = $db->do("insert into $fakenow (fid, rev, arrival) values ($cfid,$newrev, \"$carrival\");");
+	    my $sth = do_sql($db, "select id from $fakenow where fid = $cfid and rev = $newrev;");
 
 	    # get new fake serial(fs)
-	    my ($fs) = $sth->fetchrow_array();
+	    my ($newfs) = $sth->fetchrow_array();
 	    $sth->finish;
 
 	    # copy from previous revision
-	    $db->do("insert into $fakeplayer (fs,uid) as select $fs, uid from $fakeplayer where fs = $cid" );
-	    $db->do("insert into $fakevil    (fs,vid) as select $fs, vid from $fakevil    where fs = $cid" );
+	    my $ret1 = $db->do("insert into $fakeplayer (fs,uid) select $newfs, uid from $fakeplayer where fs = $cid;" );
+	    my $ret2 = $db->do("insert into $fakevil    (fs,vid) select $newfs, vid from $fakevil    where fs = $cid;" );
+	    # print "DBG: newfs=$newfs, oldfs=$cid crev = $crev newcrev = $newrev ($ret1,$ret2)\n";
 
 	} elsif( $exec eq $msg{new} ){
 	    # new fakeset
@@ -2564,6 +2656,27 @@ sub exec_fakelist {
     return show_fakelist($db,$x,$y,$vel,$tsq);
 }
 
+sub fakelist_show_hidden {
+    my($id,$fid,$rev) = @_;
+    
+    print "<input type=hidden name=id value=$id>\n";
+    print "<input type=hidden name=fid value=$fid>\n";
+    print "<input type=hidden name=rev value=$rev>\n";
+}
+
+sub fakelist_get_cgi_param {
+    my ($cgi ) = @_;
+    
+    my $exec     = $cgi->param("exec");
+    my $cid      = $cgi->param("id");
+    my $cfid     = $cgi->param("fid");
+    my $crev     = $cgi->param("rev");
+    my $carrival = $cgi->param("arrival");
+
+    return ($exec,$cid,$cfid,$crev,$carrival);
+}
+
+    
 sub show_fakelist {
     my($db, $x,$y,$vel,$tsq) = @_;
 
@@ -2571,17 +2684,18 @@ sub show_fakelist {
 
     print "<form method=post action=\"/$script/fakelist/exec\">\n";
 
+    my $cgi = CGI->new();
+    my ($exec,$cid,$cfid,$crev,$carrival) = fakelist_get_cgi_param($cgi);
+
     my $sql = "select id, fid, rev, arrival, fixed from $fakenow order by id desc limit 1;";
+    my $sql = "select id, fid, rev, arrival, fixed from $fakenow where fid = (select max(fid) from fakenow limit 1) order by rev desc limit 1;";
     my ($id, $fid, $rev, $arrival, $fixed) = $db->selectrow_array($sql);
+    fakelist_show_hidden($id,$fid,$rev);
 
     if( !defined($id) ){
 	$id = 0; $fid = 0; $rev = 0;
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
-
-    print "<input type=hidden name=id value=$id>\n";
-    print "<input type=hidden name=fid value=$fid>\n";
-    print "<input type=hidden name=rev value=$rev>\n";
     
     # Top div
     print "<div>";
@@ -2589,10 +2703,14 @@ sub show_fakelist {
     print "<table border=0>";
     print "<tr>";
 
-    print "<td>FakeID/Rev</td><td>$fid/$rev ($id)</td>";
+    print "<td>Flight $fid</td>";
+    print "<td>Rev.$rev (SN=$id)</td>";
 
     print "<td>Arrival</td><td><input type=text name=arrival value=\"$arrival\"></td>";
     print "<td><input type=submit name=exec value=\"$msg{set_arrival}\"></td>";
+
+    $cgi = CGI->new();
+    ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
@@ -2655,10 +2773,11 @@ sub show_fakelist {
     my $sql3  = " where l.aid = 22 ";
        $sql3 .= " and ( (u.uid is not null ) or (v.vid is not null) )";
        $sql3 .= " group by l.vid ";
-       $sql3 .= " order by l.uid, duration asc ;";
+       $sql3 .= " order by duration desc ;";
 
     $sth = do_sql($db, $sql1 . $sql2 . $sql3);
 
+    print "Villages in userlist.";
     show_data_table($sth);
     print "</div>";
 
@@ -2669,16 +2788,20 @@ sub show_fakelist {
 
     my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>' ) chk ";
     $sql2a    .= " from art a join last l on a.x = l.x and a.y = l.y ";
-    $sql2a    .= " left outer join $fakevil v on v.vid = l.vid ";
+    $sql2a    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
 
     my $sql3a  = " where l.aid = 22 ";
        $sql3a .= " group by l.vid ";
-    $sql3a    .= " order by l.uid, duration ;";
+    $sql3a    .= " order by duration desc;";
 
     $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    print "Artifacts.";
     show_data_table($sth);
 
     print "</div>";    # end of artifact
+
+    fakelist_show_capital($db, $x,$y,$vel,$tsq, $arrival, $id, "Captails without artifact not in fakelist.");
+
     print "</div>\n";  # end of left
 
     print "</form>\n";
@@ -2862,7 +2985,7 @@ if( $info =~ /show/ || $info eq "" ){
     close_db($db);
 } elsif ( $info =~ /fakelist/ ){
     # fake now
-    show_head("Edit fakelist");
+    show_head("Fakelist");
     my $db = open_db();
     show_fakelist($db, $x,$y,$vel,$tsq);
     close_db($db);
