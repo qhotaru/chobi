@@ -1588,7 +1588,7 @@ sub show_fakenow {
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,";
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
-    $sql1 .= " f.reserved, f.fired, ";
+    $sql1 .= " f.reserved, f.fired, case when f.enabled > 0 then 'Y' else '' end FL, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
     $sql2    .= " case when $intime then '' else 'LATE' end late , ";
@@ -1596,8 +1596,7 @@ sub show_fakenow {
     $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
-    my $sql3  = " where l.aid = 22 and ( $intimem or ( f.enabled > 0 ) )";
-
+    my $sql3  = " where l.aid in ($tg_aidlist) and ( $intimem or ( f.fs = $id and f.enabled > 0 ) )";
     $sql3 .= " order by start asc";
     $sql3 .= " limit 100;";
 
