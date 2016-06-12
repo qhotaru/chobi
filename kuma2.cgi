@@ -1386,9 +1386,7 @@ sub get_location_by_login {
 }
 
 sub exec_fakenow {
-    my($db, $x,$y,$vel,$tsq) = @_;
-
-    my $cgi      = CGI->new();
+    my($db, $cgi, $x,$y,$vel,$tsq) = @_;
 
     my($exec,$cid,$cfid,$crev) = fakelist_get_cgi_param($cgi);
 
@@ -1421,7 +1419,7 @@ sub exec_fakenow {
 	}
     }
 
-    return show_fakenow($db,$x,$y,$vel,$tsq);
+    return show_fakenow($db,$cgi, $x,$y,$vel,$tsq);
 }
 
 sub sortable_control {
@@ -1503,10 +1501,15 @@ EOT
 ;	
 }
 
+#
+# add mergin
+#
 sub show_fakenow {
-    my($db, $x,$y,$vel,$tsq) = @_;
+    my($db, $cgi, $x,$y,$vel,$tsq) = @_;
 
     init_fakenow($db);
+    my $mergin = $cgi->param("mergin");
+    $mergin = 2 if( !defined($mergin));
 
     print "<form method=post action=/$script/fakenow/exec>\n";
 
@@ -1530,6 +1533,11 @@ sub show_fakenow {
     print "<tr>";
     print "<td>Flight $fid</td><td>Rev. $rev (SN=$id)</td>";
     print "<td>Arrival</td><td><b color=red>$arrival</b></td>";
+
+    print "<td>Mergin(hour)</td><td>";
+    print "<input type=text size=4 name=mergin value=$mergin>";
+    print "</td>";
+
     print "<td>X</td><td><input type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input type=text size=5 name=y value=$y></td>";
     print "<td>VEL</td><td><input type=text size=5 name=vel value=$vel></td>";
@@ -1572,6 +1580,10 @@ sub show_fakenow {
     # show general villages
     #
     print "<div>";
+
+    my $intimem  = "(TIMESTAMPDIFF(second, now(), \"$arrival\") >= (travel(dist($x,$y,l.x,l.y), $vel, $tsq)-$mergin)*3600)";
+    my $intime   = "(TIMESTAMPDIFF(second, now(), \"$arrival\") >= (travel(dist($x,$y,l.x,l.y), $vel, $tsq))*3600)";
+
     my $sql1  = "select DATE_FORMAT(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ),'%c-%d %H:%i:%s') start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,";
@@ -1579,16 +1591,14 @@ sub show_fakenow {
     $sql1 .= " f.reserved, f.fired, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
-    $sql2    .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late , ";
+    $sql2    .= " case when $intime then '' else 'LATE' end late , ";
     $sql2    .= " DATE_FORMAT(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second),'%c-%d %H:%i:%s') arrive ";
     $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
-    my $sql3  = " where l.aid = 22 ";
-    $sql3    .= " and ( (TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) ) ";
-    $sql3    .= "       or ( f.enabled > 0 ) )";
+    my $sql3  = " where l.aid = 22 and ( $intimem or ( f.enabled > 0 ) )";
 
-    $sql3 .= " order by duration desc";
+    $sql3 .= " order by start asc";
     $sql3 .= " limit 100;";
 
     my $sqlvil = $sql1 . $sql2 . $sql3;
@@ -1598,30 +1608,6 @@ sub show_fakenow {
 
     show_data_table($sth, "id=\"gvil\" class=\"sortable\"");
 
-=pod    
-    print <<EOT
-	<div id="controls">
-		<div id="perpage">
-			<select onchange="sorter.size(this.value)">
-			<option value="5">5</option>
-				<option value="10">10</option>
-				<option value="20" selected="selected">20</option>
-				<option value="50">50</option>
-				<option value="100">100</option>
-			</select>
-			<span>Entries Per Page</span>
-		</div>
-		<div id="navigation">
-			<img src="/css/images/first.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1,true)" />
-			<img src="/css/images/previous.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1)" />
-			<img src="/css/images/next.gif" width="16" height="16" alt="First Page" onclick="sorter.move(1)" />
-			<img src="/css/images/last.gif" width="16" height="16" alt="Last Page" onclick="sorter.move(1,true)" />
-		</div>
-		<div id="text">Displaying Page <span id="currentpage"></span> of <span id="pagelimit"></span></div>
-	</div>
-EOT
-;
-=cut
     sortable_control("sorter", "currentpage", "pagelimit", "controls", "perpage", "navigation");
     sortable_init(   "sorter", "currentpage", "pagelimit", "gvil");
     
@@ -1635,7 +1621,7 @@ EOT
     print "<div>";
 
     my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
-    $sql2a .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late, ";
+    $sql2a .= " case when $intime then '' else 'LATE' end late, ";
     $sql2a   .= " DATE_FORMAT(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second),'%c-%d %H:%i:%s') arrive ";
     $sql2a .= " from art a join last l on a.x = l.x and a.y = l.y ";
     $sql2a .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
@@ -1653,7 +1639,10 @@ EOT
     print "</div>";    # end of artifact
 
     print "<hr>";
-    
+
+    #
+    # show capitals
+    #
     print "<div>";
     fakenow_show_capital($db, $x,$y,$vel,$tsq,$arrival,$id, "Capitals without artifact and not in fakelist.");
     print "</div>";
@@ -1668,6 +1657,8 @@ EOT
 sub fakenow_show_capital {
     my($db, $x,$y,$vel,$tsq, $arrival, $id, $title) = @_;
 
+    my $intime   = "(TIMESTAMPDIFF(second, now(), \"$arrival\") >= (travel(dist($x,$y,l.x,l.y), $vel, $tsq))*3600)";
+
     my $sql1  = "select df(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second )) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " usera(l.uid,l.user) player, l.village,";
@@ -1677,7 +1668,7 @@ sub fakenow_show_capital {
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
 
     
-    $sql2    .= " case when TIMESTAMPDIFF(HOUR, curtime(), \"$arrival\") >= travel(dist($x,$y,l.x,l.y), $vel, $tsq) then '' else 'LATE' end late , ";
+    $sql2    .= " case when $intime then '' else 'LATE' end late , ";
     $sql2    .= " df(date_add(now(), interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second)) arrive ";
 
 
@@ -1686,8 +1677,8 @@ sub fakenow_show_capital {
 
     my $sql3  = " where l.aid = 22 ";
     $sql3    .= " and f.vid is null and a.x is null "; # not in fakelist neither artifact
-    $sql3 .= " order by duration desc";
-    $sql3 .= " limit 20;";
+    $sql3 .= " order by start asc";
+    # $sql3 .= " limit 20;";
 
     my $sqlvil = $sql1 . $sql2 . $sql3;
     # print "$sqlvil\n";
@@ -3014,11 +3005,9 @@ sub show_fakelist {
     # right div
     #
     print "<div style=\"float:left;vertical-align:top;\">";
-
     print "<p><input type=submit name=exec value=\"$msg{set_village}\"></p>";
-
-    # show villages
-    #   conditions:  uid in $fakeplayer  or  vid in $fakevil
+    #
+    # show villages : conditions:  uid in $fakeplayer  or  vid in $fakevil
     #
     print "<div>";
 
@@ -3322,13 +3311,13 @@ if( $info =~ /show/ || $info eq "" ){
     # exec fake now
     show_head("Fake now");
     my $db = open_db();
-    exec_fakenow($db, $x,$y,$vel,$tsq);
+    exec_fakenow($db, $cgi, $x,$y,$vel,$tsq);
     close_db($db);
 } elsif ( $info =~ /fakenow/ ){
     # fake now
     show_head("Fake now");
     my $db = open_db();
-    show_fakenow($db, $x,$y,$vel,$tsq);
+    show_fakenow($db, $cgi, $x,$y,$vel,$tsq);
     close_db($db);
 
 } elsif ( $info =~ /fakelist\/exec/ ){

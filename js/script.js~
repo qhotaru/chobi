@@ -57,7 +57,7 @@ TINY.table=function(){
 		if(!isNaN(i)&&!isNaN(n)){g=i,h=n}
 		i=Date.parse(f); n=Date.parse(c);
 		if(!isNaN(i)&&!isNaN(n)){g=i; h=n}
-		return g>h?-1:(g<h?1:0)
+		return g>h?1:(g<h?-1:0)
 	};
 	return{sorter:sorter}
 }();

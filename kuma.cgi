@@ -34,6 +34,7 @@ use Time::Local;
 #
 # Globals
 #
+my $tg_aidlist = "22";
 my $g_login_title = encode('utf-8', "<h1> Login : みんなの交通安全</h1>");   # external code
 my $g_login;
 
@@ -46,10 +47,15 @@ my %msg = (
     "save"      => "保存",
     "show"      => "表示",
     "fix"       => "公開",
+
     "set_arrival"   => "到着時刻登録",
     "set_player"    => "プレイヤー登録",
     "set_village"   => "村登録",
     "set_grid"      => "送付元登録",
+    "list"          => "フォーラム用",
+    "artifact"      => "秘宝",
+    "capital"       => "首都",
+    "fakelist"      => "fakelist",
     );
 
 foreach my $ee (keys %msg){
@@ -466,51 +472,85 @@ sub show_head {
     print '<head>';
     print "<title> $title </title>";
 
-  print "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/mana.css\">\n";
-  print '</head>';
-  print '<body>';
-  print "\n";
+    print "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/mana.css\">\n";
+    print "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/style.css\">\n";
+    print "<script type=\"text/javascript\" src=\"/js/script.js\"></script>";
 
-  show_script();
-  
-  print "-- $g_login --";
-  print "||";
-  print get_menu_item("show","show");
-  print "||";
-  print get_menu_item("atinfo","atinfo");
-  print "||";
-  print get_menu_item("armlog","armlog");
-  print "||";
-  print get_menu_item("fakenow","fakenow");
-  print "||";
-  print get_menu_item("fakelist","fakelist");
-  print "||";
-  print " -- ";
-  print "||";
-  print get_menu_item("login","login");
+    print '</head>';
+    print '<body>';
+    print "\n";
 
-  my $msg = encode('utf-8', "他サイト");
+    show_script();
+
+    if( 0 ){
+	print "-- $g_login --";
+	print "||";
+	print get_menu_item("show","show");
+	print "||";
+	print get_menu_item("atinfo","atinfo");
+	print "||";
+	print get_menu_item("armlog","armlog");
+	print "||";
+	print get_menu_item("fakenow","fakenow");
+	print "||";
+	print get_menu_item("fakelist","fakelist");
+	print "||";
+	print " -- ";
+	print "||";
+	print get_menu_item("login","login");
+
+	my $msg = encode('utf-8', "他サイト");
     
-  print "|| -- $msg -- ||";
-  print get_menu_item1("narusa","http://153.126.160.254/defence");
-  my $msg = encode('utf-8', "データロード");
-  print "|| -- $msg -- ||";
-  print get_menu_item("load_narusa","load");
-#  print get_menu_item("reinit","reinit");
-#  print "||";
-#  print get_menu_item("init","init");
-#  print "||";
-  my $msg = encode('utf-8', "デバック用");
-  print "|| -- $msg -- ||";
-  print get_menu_item("sk","sk");
-  print "||";
-  print get_menu_item("update_atinfo","update_atinfo");
-  print "||";
-  print "\n";
+	print "|| -- $msg -- ||";
+	print get_menu_item1("narusa","http://153.126.160.254/defence");
+	my $msg = encode('utf-8', "データロード");
+	print "|| -- $msg -- ||";
+	print get_menu_item("load_narusa","load");
+	#  print get_menu_item("reinit","reinit");
+	#  print "||";
+	#  print get_menu_item("init","init");
+	#  print "||";
+	my $msg = encode('utf-8', "デバック用");
+	print "|| -- $msg -- ||";
+	print get_menu_item("sk","sk");
+	print "||";
+	print get_menu_item("update_atinfo","update_atinfo");   print "||";
+	print "\n";
+    }
   
-  print "<h1> $title </h1>\n";
+    print "<h1> $title </h1>\n";
 
-#  my $info = $ENV{"PATH_INFO"};
+    my %menulabels = (
+	"load_narusa" => "データロード",
+	"other_sites" => "他サイト",
+	"for_debug"   => "デバック用",
+	);
+    
+
+    #####
+    print "<table><tr>";
+    my @menuitems = qw(-- show atinfo armlog fakenow fakelist artifact -- login ||other_sites ,narusa,http://153.126.160.254/defence ||load_narusa load_narusa ||for_debug sk update_atinfo ||);
+
+    print "<td>$g_login</td>";
+
+    foreach my $item (@menuitems){
+	if( $item eq "--" || $item eq "||"){
+	    # separator
+	    print "<td>||$item</td>";
+	} elsif( $item =~ /^\|\|/ ){
+	    # label
+	    $item =~ s/^\|\|//;
+	    my $msg = encode('utf-8', $menulabels{$item});
+	    print "<td>||$msg</td>";
+	} elsif( $item =~ /^,/ ){
+	    my($blank,$name,$link) = split(/,/,$item);
+	    print "<td>||", get_menu_item1($name,$link), "</td>";
+	} else {
+	    # link
+	    print "<td>||", get_menu_item1($item,$item), "</td>";
+	}
+    }
+    print "</tr></table>\n";
 }
 
 sub show_tail {
@@ -559,25 +599,35 @@ sub do_sql {
 }
 
 sub show_data_table {
-    my($sth,$title_ap, $func) = @_;
+    my($sth,$idname) = @_;
     
     my $num_rows = $sth->rows;
-
-    print "Found $num_rows rows<br>\n";
-    print "<table class=bstyle>\n";
-
-    if( !defined($title_ap) ){
-	$title_ap = $sth->{NAME};
-    }
     
+    print "Found $num_rows rows<br>\n";
+    if( !defined($idname) ){
+	print "<table class=bstyle $idname>\n";
+    } else {
+	print "<table $idname>\n";
+    }
+
+    #if( !defined($title_ap) ){
+    my $title_ap = $sth->{NAME};
+    #}
+    my $func = undef;
+    #
     # show table header
+    #
+    print "<thead>";
     print "<tr>";
     foreach my $hh (@$title_ap){
 	print "<th>$hh</th>\n";
     }
     print "</tr>";
+    print "<thead>";
 
     my $eo = "class=even";
+
+    print "<tbody>";
     
     for (my $i=0; $i<$num_rows; $i++) {
 	my @a = $sth->fetchrow_array;
@@ -595,6 +645,7 @@ sub show_data_table {
 	}
 	print "</tr>\n";
     }
+    print "</tbody>";
     print "</table>\n";
     $sth->finish;
 }
@@ -1203,7 +1254,6 @@ sub show_atinfo {
     }
     print "</table>\n";
     $sth->finish;
-#    show_data_table($sth);
 
     close_db($db);
 }
@@ -1374,6 +1424,84 @@ sub exec_fakenow {
     return show_fakenow($db,$x,$y,$vel,$tsq);
 }
 
+sub sortable_control {
+    my($svar, $curid, $pagelimitid, $contid, $perpageid, $naviid) = @_;
+
+    print <<EOT
+	<div id=\"$contid\" class="controls_class">
+		<div id=\"$perpageid\" class="perpage_class">
+			<select onchange="$svar.size(this.value)">
+			<option value="5">5</option>
+				<option value="10">10</option>
+				<option value="20" selected="selected">20</option>
+				<option value="50">50</option>
+				<option value="100">100</option>
+			</select>
+			<span>Entries Per Page</span>
+		</div>
+		<div id=\"$naviid\" class="navigation_class">
+			<img src="/css/images/first.gif" width="16" height="16" alt="First Page" onclick="$svar.move(-1,true)" />
+			<img src="/css/images/previous.gif" width="16" height="16" alt="First Page" onclick="$svar.move(-1)" />
+			<img src="/css/images/next.gif" width="16" height="16" alt="First Page" onclick="$svar.move(1)" />
+			<img src="/css/images/last.gif" width="16" height="16" alt="Last Page" onclick="$svar.move(1,true)" />
+		</div>
+		<div class="sortable_text_class">Displaying Page <span id=\"$curid\"></span> of <span id=\"$pagelimitid\"></span></div>
+	</div>
+EOT
+;
+
+=pod    
+    print <<EOT
+	<div id="controls">
+		<div id="perpage">
+			<select onchange="sorter.size(this.value)">
+			<option value="5">5</option>
+				<option value="10">10</option>
+				<option value="20" selected="selected">20</option>
+				<option value="50">50</option>
+				<option value="100">100</option>
+			</select>
+			<span>Entries Per Page</span>
+		</div>
+		<div id="navigation">
+			<img src="/css/images/first.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1,true)" />
+			<img src="/css/images/previous.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1)" />
+			<img src="/css/images/next.gif" width="16" height="16" alt="First Page" onclick="sorter.move(1)" />
+			<img src="/css/images/last.gif" width="16" height="16" alt="Last Page" onclick="sorter.move(1,true)" />
+		</div>
+		<div id="text">Displaying Page <span id="currentpage"></span> of <span id="pagelimit"></span></div>
+	</div>
+EOT
+;
+=cut
+}
+
+sub sortable_init {
+    my($svar, $curid, $pagelimitid, $tableid) = @_;
+
+    print <<EOT
+    <script type="text/javascript">
+    <!--
+        var $svar = new TINY.table.sorter(\'$svar\');
+        $svar.head = 'head'; //header class name
+	$svar.asc = 'asc'; //ascending header class name
+	$svar.desc = 'desc'; //descending header class name
+	$svar.even = 'evenrow'; //even row class name
+	$svar.odd = 'oddrow'; //odd row class name
+	$svar.evensel = 'evenselected'; //selected column even class
+	$svar.oddsel = 'oddselected'; //selected column odd class
+	$svar.paginate = true ; //toggle for pagination logic
+	$svar.pagesize = 20 ; //toggle for pagination logic
+	
+	$svar.currentid = \'$curid\'; //current page id
+	$svar.limitid = \'$pagelimitid\'; //page limit id
+
+	$svar.init(\'$tableid\',1);
+    -->
+    </script>
+EOT
+;	
+}
 
 sub show_fakenow {
     my($db, $x,$y,$vel,$tsq) = @_;
@@ -1421,24 +1549,21 @@ sub show_fakenow {
 
     print "</div>";
 
-    
-    # print "<div style=\"clear:both;\"></div>\n";
-
     #
     # left div
     #
-
     print "<div style=\"float:left;\">";
-    # players list
-    # username, checkbox
+    # players list: username checkbox
     $sql = "select user, concat('<input type=checkbox name=player value=', uid, '>') chk from last l where aid = 22 group by uid order by sum(population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
 
     print "</div>\n";
 
+    #
+    # SPACER div
+    #
     print "<div style=\"float:left;width=20px;\"></div>";
-
     #
     # right div
     #
@@ -1464,13 +1589,42 @@ sub show_fakenow {
     $sql3    .= "       or ( f.enabled > 0 ) )";
 
     $sql3 .= " order by duration desc";
-    $sql3 .= " limit 20;";
+    $sql3 .= " limit 100;";
 
     my $sqlvil = $sql1 . $sql2 . $sql3;
     # print "$sqlvil\n";
     $sth = do_sql($db, $sqlvil);
     print "<b>Villages on time and in fakelist. </b>";
-    show_data_table($sth);
+
+    show_data_table($sth, "id=\"gvil\" class=\"sortable\"");
+
+=pod    
+    print <<EOT
+	<div id="controls">
+		<div id="perpage">
+			<select onchange="sorter.size(this.value)">
+			<option value="5">5</option>
+				<option value="10">10</option>
+				<option value="20" selected="selected">20</option>
+				<option value="50">50</option>
+				<option value="100">100</option>
+			</select>
+			<span>Entries Per Page</span>
+		</div>
+		<div id="navigation">
+			<img src="/css/images/first.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1,true)" />
+			<img src="/css/images/previous.gif" width="16" height="16" alt="First Page" onclick="sorter.move(-1)" />
+			<img src="/css/images/next.gif" width="16" height="16" alt="First Page" onclick="sorter.move(1)" />
+			<img src="/css/images/last.gif" width="16" height="16" alt="Last Page" onclick="sorter.move(1,true)" />
+		</div>
+		<div id="text">Displaying Page <span id="currentpage"></span> of <span id="pagelimit"></span></div>
+	</div>
+EOT
+;
+=cut
+    sortable_control("sorter", "currentpage", "pagelimit", "controls", "perpage", "navigation");
+    sortable_init(   "sorter", "currentpage", "pagelimit", "gvil");
+    
     print "</div>";
 
     print "<hr>";
@@ -1491,9 +1645,15 @@ sub show_fakenow {
 
     $sth = do_sql($db, $sqlart);
     print "<b>Artifacts.</b>";
-    show_data_table($sth);
+    show_data_table($sth, "id=\"gvil2\" class=\"sortable\"");
+
+    sortable_control("sorter2", "currentpage2", "pagelimit2", "controls2", "perpage2", "navigation2");
+    sortable_init(   "sorter2", "currentpage2", "pagelimit2", "gvil2");
+
     print "</div>";    # end of artifact
 
+    print "<hr>";
+    
     print "<div>";
     fakenow_show_capital($db, $x,$y,$vel,$tsq,$arrival,$id, "Capitals without artifact and not in fakelist.");
     print "</div>";
@@ -1533,7 +1693,11 @@ sub fakenow_show_capital {
     # print "$sqlvil\n";
     my $sth = do_sql($db, $sqlvil);
     print $title;
-    show_data_table($sth);
+    show_data_table($sth, "id=gvil3 class=sortable");
+
+    sortable_control("sorter3", "currentpage3", "pagelimit3", "controls3", "perpage3", "navigation3");
+    sortable_init(   "sorter3", "currentpage3", "pagelimit3", "gvil3");
+
 }
 
 sub fakelist_show_capital {
@@ -2539,7 +2703,7 @@ sub do_snip {
 
     print "<table class=bstyle>\n";
 
-    print join("",map {"<th>$_</th>"} qw(Vel Army Start Arrival Duration Destination DF AT Note));
+    print join("",map {"<th>".$_."</th>"} qw(Vel Army Start Arrival Duration Destination DF AT Note));
 
     my $ix = 0;
 
@@ -2650,6 +2814,103 @@ sub exec_fakelist {
 	    # new fakeset
 	    my $nextfid = $cfid + 1;
 	    my $ret = $db->do("insert into $fakenow (fid,rev,arrival) values ($nextfid, 0, \"$carrival\");");
+	} elsif( $exec eq $msg{list} ){
+	    #
+	    # show fakelist
+	    #
+	    # show_head("Fakelist for forum");
+
+	    my $t_art     = "art";
+	    my $t_capital = "capital";
+	    print "<table border=0>";
+	    #
+	    # ff fakevil
+	    #
+	    if(1){
+		# my $title = $msg{"fakelist"};
+		my $title = "selected";
+		print "<tr><td>$title</td></tr>";
+
+		my $sql = "select bbgrid(l.x,l.y) grid, bbuser(l.uid) user, case when c.x is null then '' else 'cap' end cap, a.name aname";
+
+		$sql .= " from $fakevil f join last l  on f.vid = l.vid and f.fs = $cid ";
+		$sql .= " left outer join $t_art a     on a.x = l.x and a.y = l.y ";
+		$sql .= " left outer join $t_capital c on c.x = l.x and c.y = l.y ";
+
+		$sql .= " where l.aid = 22 ";
+		$sql .= " order by l.y desc;";
+	    
+		my $sth = do_sql($db, $sql );
+		my $num_rows = $sth->rows();
+		for(my $ix=0;$ix<$num_rows;$ix++){
+		    my($grid, $user,$cap,$aname) = $sth->fetchrow_array();
+		    # if ($cap eq "cap" ){ $cap = $msg{"capital"};}
+		    print "<tr><td>$grid</td><td>$user</td><td>$cap</td><td>$aname</td></tr>";
+		}
+	    }
+	    #
+	    # ff artifacts
+	    #
+	    my $sql = "select bbgrid(a.x,a.y) grid, bbuser(l.uid) player, a.name, case when c.x is null then '' else 'cap' end cap from $t_art a join last l on a.x=l.x and a.y=l.y left outer join $t_capital c on c.x=l.x and c.y=l.y where l.aid = 22 order by l.uid ;";
+	    my $sth = do_sql($db, $sql );
+	    my $num_rows = $sth->rows();
+
+	    my $title = $msg{"artifact"};
+	    print "<tr><td>$title</td></tr>";
+
+	    for(my $ix=0;$ix<$num_rows;$ix++){
+		my($grid, $player, $aname, $cap) = $sth->fetchrow_array();
+		# if ($cap eq "cap" ){ $cap = $msg{"capital"};}
+		print "<tr><td>$grid</td><td>$player</td><td>$cap</td><td>$aname</td></tr>";
+	    }
+	    #
+	    # ff players
+	    #
+	    my $title = "Players";
+	    print "<tr><td>$title</td></tr>";
+
+	    my $sth = do_sql($db, "select f.uid from $fakeplayer f where fs = $cid;");
+	    my $num_rows = $sth->rows();
+	    for(my $ix=0;$ix<$num_rows;$ix++){
+		my($uid) = $sth->fetchrow_array();
+		
+		print "<tr><th>--- \[player\]$uid\[/player\] ---</td><td></td></tr>";
+		my $st2  = do_sql($db, "select bbgrid(l.x,l.y) grid, a.name artname, case when c.x is null then '' else 'cap' end cap from last l left outer join $t_capital c on c.x=l.x and c.y=l.y left outer join $t_art a on a.x = l.x and a.y = l.y where l.uid = $uid order by l.population desc;");
+		my $num2 = $st2->rows();
+		for(my $ix2=0;$ix2<$num2;$ix2++){
+		    my($grid, $aname, $cap) = $st2->fetchrow_array();
+		    # if ($cap eq "cap" ){ $cap = $msg{"capital"};}
+		    print "<tr><td>$grid</td><td>$cap</td><td>$aname</td></tr>";
+		}
+	    }
+	    #
+	    # ff Caitals
+	    #
+	    if(1){
+		my $title = $msg{"capital"};
+		print "<tr><td>$title</td></tr>";
+
+		my $sql = "select bbgrid(l.x,l.y) grid, bbuser(l.uid) user, l.user player";
+		$sql .= " from $t_capital c join last l on c.x   = l.x and c.y = l.y ";
+		$sql .= " left outer join $fakeplayer f on f.uid = l.uid ";
+		$sql .= " left outer join $t_art a      on a.x   = l.x and a.y = l.y ";
+		$sql .= " where f.uid is null and a.x is null and l.aid in ($tg_aidlist) ";
+#		$sql .= "   and l.uid in (select uid from last where aid = 22 group by uid order by sum(population) desc limit 20) ";
+		$sql .= " order by l.population desc ;";
+	    
+		my $sth = do_sql($db, $sql );
+		my $num_rows = $sth->rows();
+		for(my $ix=0;$ix<$num_rows;$ix++){
+		    my($grid, $user, $player) = $sth->fetchrow_array();
+		    print "<tr><td>$grid</td><td>$user</td><td>$player</td></tr>";
+		}
+	    }
+	    #
+	    # ff footer
+	    #
+	    print "</table>\n";
+	    show_tail();
+	    exit 0;
 	}
     }
 
@@ -2725,6 +2986,7 @@ sub show_fakelist {
     print "<input type=submit name=exec value=\"$msg{new}\">";
     print "<input type=submit name=exec value=\"$msg{save}\">";
     print "<input type=submit name=exec value=\"$msg{fix}\">";
+    print "<input type=submit name=exec value=\"$msg{list}\">";
     print "</p>";
 
     print "</div>";
@@ -2812,6 +3074,101 @@ sub show_fakelist {
 
 }
 
+sub art_form {
+    print "<form name=art method=post action=\"/$script/art\">";
+
+    print "<table border=0>";
+    print "<tr>";
+    print "<td> x <input type=text size=5 name=x></td>";
+    print "<td> y <input type=text size=5 name=y></td>";
+    print "<td> name <input type=text name=name></td>";
+    print "<td> Level <select name=level>";
+    print "<option value=0>Bronz</option>";
+    print "<option value=1>Silver</option>";
+    print "<option value=2>Unique</option>";
+    print "</select></td>";
+    print "<td>note <input type=text name=note></td>";
+    print "<td><input type=submit name=exec value=add></td>";
+    print "</tr>";
+    print "</table>";
+
+    print "</form>\n";
+}
+
+sub show_art {
+    my($db,$cgi) = @_;
+
+    my $ax    = $cgi->param("x");
+    my $ay    = $cgi->param("y");
+    my $ano   = $cgi->param("no");
+    my $level = $cgi->param("level");
+    my $name  = $cgi->param("name");
+    my $note  = $cgi->param("note");
+    my $exec  = $cgi->param("exec");
+    my $setid = $cgi->param("set");
+
+    print "DBG: ($ax, $ay) no $ano level $level name $name exec $exec set $setid note $note\n";
+    if( $exec eq "add" ){
+	# add x,y,name, level
+	my $sql = "insert into art (x,y,name,level,note) values ($ax,$ay,$name,$level,\"$note\");";
+	$db->do($sql);
+    } elsif( $setid > 0 ){
+	# set x,y
+	my $sql = "update art set x=$ax, y=$ay, no=$ano, note=\"$note\" where id=$setid;";
+	$db->do($sql);
+    }
+
+    show_head("Artifact");
+
+    # show form for add
+    art_form($cgi);
+
+    # show list
+    my @labels = qw(id name no grid user ally cap x y no note set);
+
+    my $sql = "select a.id, a.x, a.y, a.name, a.bronz, a.level, gridlink(a.x,a.y) grid, l.user, l.alliance, case when c.x is not null then \"capital\" else \"\" end cap, no, note from art a join last l on a.x = l.x and a.y = l.y left outer join capital c on c.x = a.x and c.y = a.y  order by a.name, a.no, a.id;";
+    my $sth = do_sql($db,$sql);
+    my $num_rows = $sth->rows();
+
+    print "<table class=bstyle>";
+    print "<tr>";
+
+    print join("", map { "<th>".$_."</th>" } @labels );
+    print "</tr>";
+    for(my $ix=0;$ix<$num_rows;$ix++){
+	print "<tr>";
+	print "<form name=artlist method=post action=\"/$script/artifact\">";
+
+	my($id,$x,$y,$name,$bronz,$level,$grid,$user,$ally, $cap, $ano, $note) = $sth->fetchrow_array();
+
+	# data
+	print "<td>$id</td>";
+	print "<td>$name</td>";
+	print "<td>$ano</td>";
+	print "<td>$grid</td>";
+	print "<td>$user</td>";
+	print "<td>$ally</td>";
+	print "<td>$cap</td>";
+
+	# buton
+	print "<td><input type=text size=5 name=x value=$x></td>";
+	print "<td><input type=text size=5 name=y value=$y></td>";
+	print "<td><input type=text size=5 name=no value=$ano></td>";
+	print "<td><input type=text name=note value=$note></td>";
+	print "<td><input type=submit size=5 name=set value=$id></td>";
+
+	print "</form>\n";
+	print "</tr>";
+    }
+    print "</table>\n";
+    # show_tail();
+}
+
+
+#
+# Main
+#
+
 #
 # create table sk (id serial, sx int, sy int, dx int, dy int, dtime datetime, stime datetime, regtime datetime, note varchar(128));
 #
@@ -2832,10 +3189,6 @@ sub show_fakelist {
 #
 
 #
-# Main
-#
-
-#
 # Auth
 #
 # Pass 1. Authed -> go
@@ -2849,6 +3202,8 @@ my $inline = 0;
 
 my($x,$y,$vel, $tsq) = (0,0,3,20);
 
+my $cgi = CGI->new();
+
 if ( $#ARGV < 0 ) {
     # Auth
     auth();
@@ -2858,8 +3213,6 @@ if ( $#ARGV < 0 ) {
 
     # remove heading /
     $info =~ s/^\///;
-
-    my $cgi = CGI->new();
 
     $x   = $cgi->param("x");
     $y   = $cgi->param("y");
@@ -2907,7 +3260,7 @@ if( $info =~ /show/ || $info eq "" ){
 } elsif ( $info =~ /init/ ){
     show_head();
     do_init();
-} elsif ( $info =~ /load/ ){
+} elsif ( $info =~ /load_narusa/ ){
     show_head("データロード");
     load_narusa($kumaurl);
     show_info($x,$y,$tsq,$vel, 1);
@@ -2994,6 +3347,12 @@ if( $info =~ /show/ || $info eq "" ){
     # login
     show_auth_dialog();
     exit 0;
+
+} elsif( $info =~ /^artifact/ ){
+    my $db = open_db();
+    show_art($db,$cgi);
+    close_db($db);
+
 # others
 
 } elsif ( $ENV{"REQUEST_URI"} =~ /$cpath$prog/ ){
