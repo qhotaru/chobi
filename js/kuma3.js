@@ -15,21 +15,23 @@ function filter_change (e){
     var value   = e.value;
     var checked = e.checked;
 
-    var mergin  = document.getElementById("mergin").getAttribute("value");
+    var margin  = document.getElementById("margin").getAttribute("value");
     var xx      = document.getElementById("xx").getAttribute("value");
     var yy      = document.getElementById("yy").getAttribute("value");
     var vel     = document.getElementById("vel").getAttribute("value");
     var tsq     = document.getElementById("tsq").getAttribute("value");
     var id      = document.getElementById("id").getAttribute("value");
     var arrival = document.getElementById("arrival").getAttribute("value");
+    var start   = document.getElementById("start").getAttribute("value");
 
     //var para = "x=" + xx.value + "&y=" + yy.value + "&vel=" + vel.value + "&tsq=" + tsq.value;
-    //para += "&id=" + id.value + "&mergin=" + mergin.value ;
+    //para += "&id=" + id.value + "&margin=" + margin.value ;
     //para += "&arrival=" + encodeURI(arrival.value);
 
     var para = "x=" + xx + "&y=" + yy + "&vel=" + vel + "&tsq=" + tsq;
-    para += "&id=" + id + "&mergin=" + mergin ;
+    para += "&id=" + id + "&margin=" + margin ;
     para += "&arrival=" + encodeURI(arrival);
+    para += "&start=" + encodeURI(start);
 
     var values ;
     

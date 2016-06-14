@@ -52,6 +52,9 @@ my %msg = (
     "set_player"    => "プレイヤー登録",
     "set_village"   => "村登録",
     "set_grid"      => "送付元登録",
+    "set_now"       => "今",
+    "set_start"     => "設定",
+    "set_start_plus2"     => "+2H",
     "list"          => "フォーラム用",
     "artifact"      => "秘宝",
     "capital"       => "首都",
@@ -582,18 +585,6 @@ sub datestring {
     return sprintf "%04d-%02d-%02d %02d:%02d:%02d",$year,$mon,$mday,$hour,$min,$sec;
 }
     
-
-sub to_datetime_string {
-    my($tserial) = @_;
-
-    my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst)
-	= localtime($tserial);
-    $year += 1900;
-    $mon += 1;
-
-    return sprintf "%04d-%02d-%02d %02d:%02d:%02d",$year,$mon,$mday,$hour,$min,$sec;
-}
-
 sub to_date_string {
     my($dd,$year) = @_;
 
@@ -697,16 +688,6 @@ sub show_data {
 	= localtime(time);
     $year += 1900;
     $mon += 1;
-
-=pod
-    my $t = localtime;
-    my $year = $t->year;
-    my $mon  = $t->mon;
-    my $mday = $t->mday;
-    my $hour = $t->hour;
-    my $min  = $t->min;
-    my $sec  = $t->sec;
-=cut
 
     my $regtime = "$year-$mon-$mday $hour:$min:$sec";
 
@@ -1265,9 +1246,7 @@ sub exec_fakenow {
     my($db, $cgi, $x,$y,$vel,$tsq) = @_;
 
     my($exec,$cid,$cfid,$crev) = fakelist_get_cgi_param($cgi);
-
-    my $username = $g_login;
-    $username = "unknown" if( $g_login eq "");
+    my $username = $g_login; $username = "unknown" if( $g_login eq "");
 
     my $ret = 0;
 
@@ -1292,9 +1271,23 @@ sub exec_fakenow {
 
 	    my @vils = $cgi->param("village");
 	    $ret = update_or_insert_fakevil($db, $cid, "", "", @vils);
+	} elsif( $exec eq $msg{"set_now"} ){
+	    my $now = datestring(time());
+	    $cgi->param(-name => "start", -value => $now);
+	} elsif( $exec eq $msg{"set_start"} ){
+	    # my $now = datestring(time());
+	    # $cgi->param(-name => "start", -value => $now);
+	    1;
+	} elsif( $exec eq $msg{"set_start_plus2"} ){
+	    my $dt = time();
+	    my $start = $cgi->param("start");
+	    if( defined($start) && $start ){
+		$dt = to_time_serial($start);
+	    }
+	    $dt += 3600*2;
+	    $cgi->param(-name => "start", -value => datestring($dt));
 	}
     }
-
     return show_fakenow($db,$cgi, $x,$y,$vel,$tsq);
 }
 
@@ -1386,16 +1379,21 @@ sub fakenow_show {
 }
 
 #
-# add mergin
+# add margin
 #
 sub show_fakenow {
     my($db, $cgi, $x,$y,$vel,$tsq) = @_;
 
     init_fakenow($db);
-    my $mergin = $cgi->param("mergin");
-    $mergin = 2 if( !defined($mergin));
 
-    print "<form method=post action=/$script/fakenow/exec>\n";
+    my $start  = $cgi->param("start");
+    if( !defined($start) || $start =~ /^\s*$/ ){
+	print "current start time = $start\n";
+	$start = datestring(time());
+    }
+    
+    my $margin = $cgi->param("margin");
+    $margin = 2 if( !defined($margin));
 
     my $sql = "select id, fid, rev, arrival from $fakenow where fixed > 0 order by fid desc, rev desc limit 1;";
     my ($id,$fid,$rev,$arrival) = $db->selectrow_array($sql);
@@ -1405,31 +1403,41 @@ sub show_fakenow {
 	$arrival = datestring(time() + 3600*24); # 1 day later as default
     }
 
-    my $cgi = CGI->new();
-    ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
+    ($x,$y)   = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
+    print "<form method=post action=/$script/fakenow/exec>\n";
     #
     # Top div
     #
     print "<div>";
-
     print "<table border=0>";
+
+    # Flight and arrival
     print "<tr>";
+
     print "<td>Flight $fid</td><td>Rev. $rev (SN=$id)</td>";
     print "<td>Arrival</td><td><b color=red>$arrival</b></td>";
 
-    print "<td>Mergin(hour)</td><td>";
-    print "<input id=mergin type=text size=4 name=mergin value=$mergin>";
+    # margin and start
+    print "<td>Margin(hour)</td><td>";
+    print "<input id=margin type=text size=4 name=margin value=$margin>";
     print "</td>";
 
+    # source location
     print "<td>X</td><td><input id=xx type=text size=5 name=x value=$x></td>";
     print "<td>Y</td><td><input id=yy type=text size=5 name=y value=$y></td>";
     print "<td>VEL</td><td><input id=vel type=text size=5 name=vel value=$vel></td>";
     print "<td>TSQ</td><td><input id=tsq type=text size=5 name=tsq value=$tsq></td>";
+
     print "</tr>";
     print "</table>";
 
     print "<p>";
+    print "<b>Start:</b><input id=start type=text name=start value=\"$start\">";
+    print "<input type=submit name=exec value=$msg{set_start}>";
+    print "<input type=submit name=exec value=$msg{set_now}>";
+    print "<input type=submit name=exec value=$msg{set_start_plus2}>";
+    print "<span style=\"width: 20px;\"></span><span>Fake village: </span>";
     print "<input type=submit name=exec value=$msg{reserve}>";
     print "<input type=submit name=exec value=$msg{fired}>";
     print "<input type=submit name=exec value=$msg{clear}>";
@@ -1483,23 +1491,12 @@ sub show_fakenow {
 
     my $dist     = "dist($x,$y,l.x,l.y)";
     my $travel   = "travel($dist, $vel, $tsq)";                     # travel hours
-    my $rest     = "TIMESTAMPDIFF(second, now(), \"$arrival\")";    # rest seconds
+    my $rest     = "TIMESTAMPDIFF(second, \"$start\", \"$arrival\")";    # rest seconds
     
-    my $intimem  = "( $rest >= ( $travel - $mergin ) * 3600)";
+    my $intimem  = "( $rest >= ( $travel - $margin ) * 3600)";
     my $intime   = "( $rest >= $travel * 3600 )";
 
-    if(0){
-    my $selc  = " select df(date_sub(\'$arrival\', interval round($travel * 3600,0) second )) start, ";
-    $selc    .= "   round($travel,2) duration, round($dist,2) dist, gridlink(l.x,l.y) grid, ";
-    $selc    .= "   usera(l.uid,l.user) player, l.village,";
-    $selc    .= "   iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
-    $selc    .= "   f.reserved, f.fired, case when f.enabled > 0 then 'Y' else '' end FL, ";
-    $selc     = "   concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
-    $selc    .= "   case when $intime then '' else 'LATE' end late , ";
-    $selc    .= "   df(date_add(now(), interval round($travel * 3600,0) second)) arrive ";
-    }
-    
-    my $selc  = get_selc($arrival, $x, $y, $vel, $tsq, $mergin);
+    my $selc  = get_selc($arrival, $x, $y, $vel, $tsq, $margin, $start);
     
     # for general
     my $fromc .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
@@ -1581,16 +1578,16 @@ sub get_div_title {
 
 # for inline
 sub fakenow_show_by_name {
-    my($db, $name, $value, $x, $y, $vel, $tsq, $mergin, $id, $arrival) = @_;
+    my($db, $name, $value, $x, $y, $vel, $tsq, $margin, $id, $arrival, $start) = @_;
 
     my $title = get_div_title($db, $name, $value);
-    my $selc  = get_selc($arrival, $x, $y, $vel, $tsq, $mergin);
+    my $selc  = get_selc($arrival, $x, $y, $vel, $tsq, $margin);
     
     my $dist     = "dist($x,$y,l.x,l.y)";
     my $travel   = "travel($dist, $vel, $tsq)";                     # travel hours
-    my $rest     = "TIMESTAMPDIFF(second, now(), \"$arrival\")";    # rest seconds
+    my $rest     = "TIMESTAMPDIFF(second, \"$start\", \"$arrival\")";    # rest seconds
     my $intime   = "( $rest >= $travel * 3600 )";
-    my $intimem  = "( $rest >= ( $travel - $mergin ) * 3600)";
+    my $intimem  = "( $rest >= ( $travel - $margin ) * 3600)";
 
     # for general
     my $fromc .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
@@ -1984,7 +1981,7 @@ sub show_info {
     foreach my $st (sort keys %dep){
 	# $st time serial
 	my $app = $dep{$st};
-	my $start = to_datetime_string($st);
+	my $start = datestring($st);
 
 	# show same start time
 	my $upp = [];
@@ -2030,7 +2027,7 @@ sub show_info {
     my $eo = "even";
     foreach my $st (sort keys %udep){
 	my $app = $udep{$st};
-	my $start = to_datetime_string($st);
+	my $start = datestring($st);
 	my $color = ( $st >= $now )?"intime":"outoftime";
 
 	# show same start time
@@ -2045,7 +2042,7 @@ sub show_info {
 	    my $sumwaves = 0;
 	    foreach my $pair (@$owp){
 		my($offset,$owaves) = @$pair;
-		my $dspot = dnormal(to_datetime_string($dserial+$offset));
+		my $dspot = dnormal(datestring($dserial+$offset));
 		$dlist .= "<tr><td bgcolor=white>$dspot"."x$owaves</td></tr>";
 		$sumwaves += $owaves;
 	    }
@@ -2111,7 +2108,7 @@ sub show_info {
     foreach my $st (sort keys %dep){
 	
 	my $app = $dep{$st};
-	my $start = to_datetime_string($st);
+	my $start = datestring($st);
 
 #	my $color = ( $st >= $now )?"GreenYellow":"LightGray";
 	my $color = ( $st >= $now )?"intime":"outoftime";
@@ -2370,21 +2367,22 @@ sub get_location {
 sub get_filter_param {
     my($cgi) = @_;
 
-    my $mergin  = $cgi->param("mergin");
+    my $margin  = $cgi->param("margin");
     my $id      = $cgi->param("id");
     my $arrival = $cgi->param("arrival");
+    my $start   = $cgi->param("start");
 
-    return ($mergin,$id,$arrival);
+    return ($margin,$id,$arrival, $start);
 }
 
 sub get_selc {
-    my($arrival, $x, $y, $vel, $tsq, $mergin) = @_;
+    my($arrival, $x, $y, $vel, $tsq, $margin, $start) = @_;
 
     my $dist     = "dist($x,$y,l.x,l.y)";
     my $travel   = "travel($dist, $vel, $tsq)";                     # travel hours
-    my $rest     = "TIMESTAMPDIFF(second, now(), \"$arrival\")";    # rest seconds
+    my $rest     = "TIMESTAMPDIFF(second, \"$start\", \"$arrival\")";    # rest seconds
     
-    my $intimem  = "( $rest >= ( $travel - $mergin ) * 3600)";
+    my $intimem  = "( $rest >= ( $travel - $margin ) * 3600)";
     my $intime   = "( $rest >= $travel * 3600 )";
     
     my $selc  = " select df(date_sub(\'$arrival\', interval round($travel * 3600,0) second )) start, ";
@@ -2406,9 +2404,9 @@ sub inline_filter_filter {
     print "Content-type:text/html; charset=utf-8\n\n";
 
     my($x,$y,$vel,$tsq)      = get_location($cgi);
-    my($mergin,$id,$arrival) = get_filter_param($cgi);
+    my($margin,$id,$arrival, $start) = get_filter_param($cgi);
 
-    fakenow_show_by_name($db, $name, $value, $x,$y,$vel,$tsq,$mergin,$id,$arrival);
+    fakenow_show_by_name($db, $name, $value, $x,$y,$vel,$tsq,$margin,$id,$arrival, $start);
 }
 #
 # report_table
@@ -2727,7 +2725,7 @@ sub do_snip {
 
 	my $color = ( $sserial >= $now )?"GreenYellow":"LightGray";
 
-	my $stime = to_datetime_string($sserial);
+	my $stime = datestring($sserial);
 
 	my $sdur = to_sdur($dur);
 	my $loc  = location($dx,$dy);

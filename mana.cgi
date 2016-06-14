@@ -279,23 +279,27 @@ sub do_insert {
     $year += 1900;
     $mon += 1;
 
-    my $newtable = sprintf "map%04d%02d%02d", $year, $mon, $mday;
     
-    #
-    # truncate $xtable
-    #
-    my $nrows = $db->do( "truncate table $xtable;" );
-
-    if( $nrows == undef ){
-	my $es = $db->errstr();
-	print "failed to truncate $xtable.($es)\n";
-    }
     #
     # check existance
     #
-    my $sth = do_sql($db, "show tables like \'$newtable\';");
-    $nrows = $sth->rows;
-    $sth->finish;
+    my $suf = "";
+    my $maxcnt = 10;
+    my $nrows;
+    my $newtable;
+    
+    for(my $iter=0;$iter<$maxcnt;$iter++){
+	$newtable = sprintf "map%04d%02d%02d%s", $year, $mon, $mday, $suf;
+	my $sth = do_sql($db, "show tables like \'$newtable\';");
+	$nrows = $sth->rows;
+	$sth->finish;
+
+	if( $suf eq "" ){ $suf = "a";}
+	else {
+	    $suf = chr(ord($suf)+1);
+	}
+	if( $nrows <= 0 ){ last; }
+    } # end for
 
     if( $nrows > 0 ){
 	# table already exists.
@@ -304,7 +308,16 @@ sub do_insert {
 	    return 2;
 	}
 	print "Continue to load by dropping last table because of forced mode.\n";
-	my $nrows = $db->do("drop table $newtable;");
+	my $ret = $db->do("drop table $newtable;");
+    } # if
+    #
+    # truncate $xtable
+    #
+    $nrows = $db->do( "truncate table $xtable;" );
+
+    if( $nrows == undef ){
+	my $es = $db->errstr();
+	# print "failed to truncate $xtable.($es)\n";
     }
     #
     # execute map.sql
