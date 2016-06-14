@@ -1655,7 +1655,7 @@ sub fakelist_show_capital {
 
     my $sql1  = "select df(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second )) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
-    $sql1 .= " usera(l.uid,l.user) player, l.village,";
+    $sql1 .= " usera(l.uid,l.user) player, l.village, l.population pop, ";
     $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
@@ -1743,6 +1743,15 @@ sub armlog_parse_at {
     return ($1,$2,$3);
 }
 
+sub armlog_findurl {
+    my($db, $table, $url ) = @_;
+
+    my $sth = do_sql($db, "select * from $table where url = \"$url\";");
+    my $ret = $sth->rows;
+    $sth->finish;
+    return $ret;
+}
+
 sub show_armlog {
     my($kari) = @_;
 
@@ -1751,6 +1760,7 @@ sub show_armlog {
     #
     # print "<h1> Attacker log </h1>\n";
 
+    my $db = open_db();
     my $cgi = CGI->new;
     #
     # Handle URL
@@ -1759,27 +1769,27 @@ sub show_armlog {
     foreach my $no (0..9){
 	my $pname = sprintf "url%d", $no+1;
 	my $url = $cgi->param( $pname );
-	if ( length($url) > 0 ){
+	if ( defined($url) && length($url) > 0 ){
 	    push @urls, $url;
 	}
     }
     # print "DBG: Loading ", join("," , @urls), "\n";
-
     if ( $#urls >= 0 ){
 	foreach my $url (@urls){
 	    $url =~ s/\s//g;
+	    if( armlog_findurl($db, $atmugi, $url) ){
+		print "duplicated: $url<br>\n";
+		next; 
+	    }
 #	    print "DBG: parsing $url\n";
 	    my $root = HTML::TreeBuilder->new_from_url($url);
 #	    print "DBG: searching $root\n";
 	    my $ret = parse_report_root2($root, $url);
 	}
     }
-
     #
     # Handle update realdate
     #
-    my $db = open_db();
-
     my $id    = $cgi->param("id");
     my $month = $cgi->param("month");
     my $day   = $cgi->param("day");
@@ -2387,7 +2397,7 @@ sub get_selc {
     
     my $selc  = " select df(date_sub(\'$arrival\', interval round($travel * 3600,0) second )) start, ";
     $selc    .= "   round($travel,2) duration, round($dist,2) dist, gridlink(l.x,l.y) grid, ";
-    $selc    .= "   usera(l.uid,l.user) player, l.village,";
+    $selc    .= "   usera(l.uid,l.user) player, l.village,l.population pop,";
     $selc    .= "   iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
     $selc    .= "   f.reserved, f.fired, case when f.enabled > 0 then 'Y' else '' end FL, ";
     $selc    .= "   concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
@@ -3028,7 +3038,7 @@ sub show_fakelist {
 
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
-    $sql1 .= " l.user player, l.village,";
+    $sql1 .= " l.user player, l.village,l.population pop, ";
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>') chk ";
@@ -3043,7 +3053,7 @@ sub show_fakelist {
 
     $sth = do_sql($db, $sql1 . $sql2 . $sql3);
 
-    print "Villages in userlist.";
+    print "Selected and userlist.";
     show_data_table($sth);
     print "</div>";
 
