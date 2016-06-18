@@ -2843,7 +2843,7 @@ sub exec_fakelist {
 	    # ff fakevil
 	    #
 	    if(1){
-		# my $title = $msg{"fakelist"};
+		# selected
 		my $title = "selected";
 		print "<tr><td>$title</td></tr>";
 
@@ -2902,7 +2902,7 @@ sub exec_fakelist {
 	    #
 	    # ff Caitals
 	    #
-	    if(1){
+	    if(0){
 		my $title = $msg{"capital"};
 		print "<tr><td>$title</td></tr>";
 
