@@ -6,6 +6,7 @@
 #
 # 1. add comment
 # 2. add fakelist now
+# 3. add recommend
 #
 # $Id$
 #
@@ -69,6 +70,8 @@ foreach my $ee (keys %msg){
 my $fakenow    = "fakenow";
 my $fakeplayer = "fakeplayer";
 my $fakevil    = "fakevil";
+my $t_art      = "art";
+my $t_capital  = "capital";
 #
 # 
 my %faketables = (
@@ -375,42 +378,6 @@ sub show_head {
 
     show_script();
 
-    if( 0 ){
-	print "-- $g_login --";
-	print "||";
-	print get_menu_item("show","show");
-	print "||";
-	print get_menu_item("atinfo","atinfo");
-	print "||";
-	print get_menu_item("armlog","armlog");
-	print "||";
-	print get_menu_item("fakenow","fakenow");
-	print "||";
-	print get_menu_item("fakelist","fakelist");
-	print "||";
-	print " -- ";
-	print "||";
-	print get_menu_item("login","login");
-
-	my $msg = encode('utf-8', "他サイト");
-    
-	print "|| -- $msg -- ||";
-	print get_menu_item1("narusa","http://153.126.160.254/defence");
-	my $msg = encode('utf-8', "データロード");
-	print "|| -- $msg -- ||";
-	print get_menu_item("load_narusa","load");
-	#  print get_menu_item("reinit","reinit");
-	#  print "||";
-	#  print get_menu_item("init","init");
-	#  print "||";
-	my $msg = encode('utf-8', "デバック用");
-	print "|| -- $msg -- ||";
-	print get_menu_item("sk","sk");
-	print "||";
-	print get_menu_item("update_atinfo","update_atinfo");   print "||";
-	print "\n";
-    }
-  
     print "<h1> $title </h1>\n";
 
     my %menulabels = (
@@ -422,7 +389,7 @@ sub show_head {
 
     #####
     print "<table><tr>";
-    my @menuitems = qw(-- show atinfo armlog fakenow fakelist artifact -- login ||other_sites ,narusa,http://153.126.160.254/defence ||load_narusa load_narusa ||for_debug sk update_atinfo ||);
+    my @menuitems = qw(-- show atinfo armlog fakenow fakelist artifact travel -- login ||other_sites ,narusa,http://153.126.160.254/defence ||load_narusa load_narusa ||for_debug sk update_atinfo ||);
 
     print "<td>$g_login</td>";
 
@@ -436,6 +403,7 @@ sub show_head {
 	    my $msg = encode('utf-8', $menulabels{$item});
 	    print "<td>||$msg</td>";
 	} elsif( $item =~ /^,/ ){
+	    # name and link
 	    my($blank,$name,$link) = split(/,/,$item);
 	    print "<td>||", get_menu_item1($name,$link), "</td>";
 	} else {
@@ -814,7 +782,7 @@ sub show_last_comment {
 }
 
 sub show_comment_form {
-    print "<form method=post action=/$cpath$prog/comment>\n";
+    print "<form method=post action=/$script/comment>\n";
 
     print "<p><input type=text name=who placeholder=name></p>\n";
     print "<p><textarea name=comment cols=80 rows=6 placeholder=content></textarea></p>\n";
@@ -892,6 +860,9 @@ sub show_form_sel {
     }
     print "</select>\n";
 
+    #
+    # X,Y,Vel,TSQ Selector
+    #
     print "<select name=village onchange=village_change()>\n";
     if( $vid > 0 && $uid > 0 ){
 	$sth = do_sql($db, "select vid,village from $xtable where uid = $uid;");
@@ -903,12 +874,6 @@ sub show_form_sel {
 	}
     }
     print "</select>\n";
-    
-#     print "Velocity: <input type=text size=5 name=vel value=$vel>\n";
-#     print "Tournament Square Level: <input type=text size=5 name=tsq value=$tsq>\n";
-
-#     print "<input type=submit name=go value=show>\n";
-
     print "</form>\n";
 }
 
@@ -1349,9 +1314,16 @@ EOT
 sub fakenow_show_with_div {
     my($db, $filtername, $filtervalue, $ix, $selc, $fromc, $condc ) = @_;
 
+    return fakenow_show_with_div_sql($db, $filtername, $filtervalue, $ix, $selc . $fromc . $condc );
+}
+	
+ sub fakenow_show_with_div_sql {
+    my($db, $filtername, $filtervalue, $ix, $sql ) = @_;
+
     my $divid = "vt_${filtername}_${filtervalue}";
     print "<div id=$divid>";
-    fakenow_show($db, $filtername, $filtervalue, $ix, $selc, $fromc, $condc );
+
+    fakenow_show($db, $filtername, $filtervalue, $ix, $sql, "", "" );
     print "</div>\n";
 }
 
@@ -1378,6 +1350,61 @@ sub fakenow_show {
     return 0;
 }
 
+sub get_recommend {
+    my ($db, $id, $nart, $nvil, $selc, $rest) = @_;
+	
+    my $uf = " $selc from $fakevil f join last l on l.vid = f.vid \
+               left outer join $t_capital c on c.x = l.x and c.y = l.y \
+               left outer join $t_art a     on a.x = l.x and a.y = l.y \
+               where f.fs = $id ";
+
+    if( !defined($nart) ){$nart = 5;}
+    if( !defined($nvil) ){$nvil = 3;}
+    $nart = 5; $nvil = 2;
+
+    my $ua = " $selc \
+               from $t_art a join last l on a.x = l.x and a.y = l.y \ 
+                 left outer join $t_capital c on c.x = l.x and c.y = l.y \
+                 left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               order by abs($rest) asc \
+               limit $nart ";
+
+    # fakeplayer capital and artifact
+    my $uca = "  $selc from $fakeplayer p join last l on l.uid = p.uid and p.fs = $id \
+                   join $t_capital c on c.x = l.x and c.y = l.y \
+                   left outer join $t_art a on a.x = l.x and a.y = l.y \
+                   left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               where f.vid is null and p.uid is not null and (c.x is not null or a.x is not null )";
+
+    my @uva = ();
+
+    
+    my $sth = do_sql($db, "select uid from $fakeplayer where fs = $id;");
+    my $nrows = $sth->rows();
+    for(my $ix=0;$ix<$nrows;$ix++){
+	my ($uid) = $sth->fetchrow_array();
+	my $uv = " $selc from $fakeplayer p join last l on l.uid = p.uid \
+                 left outer join $t_capital c on c.x = l.x and c.y = l.y \
+                 left outer join $t_art a on a.x = l.x and a.y = l.y \
+                 left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               where p.uid = $uid \
+                 and c.x is null and a.x is null \
+               order by abs($rest) asc limit $nvil ";
+	push @uva, "($uv)";
+    }
+    my $uvlist = join(" union ", @uva);
+    # my $uvlist = pop @uva;
+    my $uv0 = " $selc from $fakeplayer p join last l on l.uid = p.uid \
+                 join $t_capital c on c.x = l.x and c.y = l.y \
+                 left outer join $t_art a on a.x = l.x and a.y = l.y \
+                 left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               where p.uid is not null and ( c.x is null and a.x is null ) \
+               order by abs($rest) asc limit $nvil ";
+
+    # return "$uca";
+    return "($uf) union ($ua) union ($uca) union $uvlist";
+}
+
 #
 # add margin
 #
@@ -1388,15 +1415,16 @@ sub show_fakenow {
 
     my $start  = $cgi->param("start");
     if( !defined($start) || $start =~ /^\s*$/ ){
-	print "current start time = $start\n";
+	# print "current start time = $start\n";
 	$start = datestring(time());
     }
     
     my $margin = $cgi->param("margin");
     $margin = 2 if( !defined($margin));
 
-    my $sql = "select id, fid, rev, arrival from $fakenow where fixed > 0 order by fid desc, rev desc limit 1;";
-    my ($id,$fid,$rev,$arrival) = $db->selectrow_array($sql);
+    my $sql = "select id, fid, rev, arrival, nart, nvil from $fakenow where fixed > 0 order by fid desc, rev desc limit 1;";
+    my ($id,$fid,$rev,$arrival, $nart, $nvil) = $db->selectrow_array($sql);
+    my $nvil--; # nvil include capital. So, decrese capital
 
     if( !defined($id) ){
 	$id = 0; $rev = 0;
@@ -1460,7 +1488,7 @@ sub show_fakenow {
     print "<div>";   # begin category div
     print "<table class=bstyle>";
 
-    my @filters = qw(all fakelist intime artifact capital);
+    my @filters = qw(all recommend fakelist intime artifact capital);
     print "<tr><th>Filters</th><th>chk</th></tr>\n";
     foreach my $filter (@filters){
 	print "<tr><td>$filter</td><td><input type=checkbox name=filter value=$filter checked onchange=\"filter_change(this)\"></td></tr>\n";
@@ -1479,7 +1507,6 @@ sub show_fakenow {
     #
     #
     print "</div>";     # for left div
-
     #
     # SPACER div
     #
@@ -1490,7 +1517,7 @@ sub show_fakenow {
     print "<div id=\"vtables\" style=\"float:left;vertical-align:top;\">";
 
     my $dist     = "dist($x,$y,l.x,l.y)";
-    my $travel   = "travel($dist, $vel, $tsq)";                     # travel hours
+    my $travel   = "travel($dist, $vel, $tsq)";                          # travel hours
     my $rest     = "TIMESTAMPDIFF(second, \"$start\", \"$arrival\")";    # rest seconds
     
     my $intimem  = "( $rest >= ( $travel - $margin ) * 3600)";
@@ -1499,11 +1526,11 @@ sub show_fakenow {
     my $selc  = get_selc($arrival, $x, $y, $vel, $tsq, $margin, $start);
     
     # for general
-    my $fromc .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+    my $fromc .= " from last l left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $fromc    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     # for artifact
-    my $fromc2 .= " from art a join last l on a.x = l.x and a.y = l.y ";
+    my $fromc2 .= " from $t_art a join last l on a.x = l.x and a.y = l.y ";
     $fromc2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     # aid condition
@@ -1518,11 +1545,17 @@ sub show_fakenow {
     $sqlx    .= " limit 100;";
 
     # for capital
-    my $fromc_cap .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    my $fromc_cap .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $fromc_cap    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $condc_cap  = " $cond_aid and f.vid is null and a.x is null "; # not in fakelist neither artifact
+    
+    # show recommend
+    my $union = get_recommend($db, $id, $nart, $nvil, $selc,$rest );
+    # print $union;
 
+    # fakenow_show_with_div($db, "filter", "recommend", 5, $selc, $fromc, $cond_fl . $sqlx );
+    fakenow_show_with_div_sql($db, "filter", "recommend", 5, $union );
     # shwo fakelist
     fakenow_show_with_div($db, "filter", "fakelist", 1, $selc, $fromc, $cond_fl . $sqlx );
 
@@ -1558,6 +1591,7 @@ sub get_div_title {
     my($db, $name,$value) = @_;
 
     my %ttitle = (
+	"recommend"  => "Recommend",
 	"fakelist"  => "Fakelist.",
 	"intime"    => "In time.",
 	"artifact"  => "Artifacts.",
@@ -1590,11 +1624,11 @@ sub fakenow_show_by_name {
     my $intimem  = "( $rest >= ( $travel - $margin ) * 3600)";
 
     # for general
-    my $fromc .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+    my $fromc .= " from last l left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $fromc    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     # for artifact
-    my $fromc2 .= " from art a join last l on a.x = l.x and a.y = l.y ";
+    my $fromc2 .= " from $t_art a join last l on a.x = l.x and a.y = l.y ";
     $fromc2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     # aid condition
@@ -1611,7 +1645,7 @@ sub fakenow_show_by_name {
     #
     # for capital
     #
-    my $fromc_cap .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    my $fromc_cap .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $fromc_cap    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $condc_cap  = " $cond_aid and f.vid is null and a.x is null "; # not in fakelist neither artifact
@@ -1621,6 +1655,11 @@ sub fakenow_show_by_name {
 	my $cond = " $cond_aid and (l.uid = $value) ";
 	# my $cond = " $cond_intime and (l.uid = $value) ";
 	fakenow_show($db, $name,  $value , 100+$value, $selc, $fromc, $cond . $sqlx );
+    } elsif ( $value eq "recommend" ){
+	my $nart = 5;
+	my $nvil = 3;
+	my $sql = get_recommend($db, $id, $nart,$nvil, $selc, $rest);
+	fakenow_show($db, $name,  $value , 5, $sql, "", "");
     } elsif ( $value eq "fakelist" ){
 	# print "DBG: $selc $fromc $cond_fl $sqlx\n";
 	fakenow_show($db, $name,  $value , 1, $selc, $fromc, $cond_fl . $sqlx );
@@ -1629,7 +1668,7 @@ sub fakenow_show_by_name {
     } elsif ( $value eq "artifact" ){
 	fakenow_show($db, "filter", "artifact", 3, $selc, $fromc2, $cond_aid . $sqlx );
     } elsif ( $value eq "capital" ){
-	fakenow_show($db, "filter", "capital", 3, $selc, $fromc_cap, $condc_cap . $sqlx );
+	fakenow_show($db, "filter", "capital", 4, $selc, $fromc_cap, $condc_cap . $sqlx );
 	# fakenow_show_capital($db, "vt_filter_capital", "<b>$title</b>", 4, $id, $selc);
     }
     print "</bodY></html>\n";
@@ -1639,7 +1678,7 @@ sub fakenow_show_by_name {
 sub fakenow_show_capital {
     my($db, $divid, $title, $ix, $id, $selc) = @_;
 
-    my $sql2 .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    my $sql2 .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $sql3  = " where l.aid in ($tg_aidlist) ";
@@ -1659,7 +1698,7 @@ sub fakelist_show_capital {
     $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
-    $sql2    .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil f on f.vid = l.vid and f.fs = $id ";
 
     my $sql3  = " where l.aid = 22 ";
@@ -2836,8 +2875,8 @@ sub exec_fakelist {
 	    #
 	    # show_head("Fakelist for forum");
 
-	    my $t_art     = "art";
-	    my $t_capital = "capital";
+	    # my $t_art     = "art";
+	    # my $t_capital = "capital";
 	    print "<table border=0>";
 	    #
 	    # ff fakevil
@@ -3042,7 +3081,7 @@ sub show_fakelist {
     $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>') chk ";
-    $sql2    .= " from last l left outer join art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= " from last l left outer join $t_art a on l.x = a.x and l.y = a.y ";
     $sql2    .= "   left outer join $fakevil    v on v.vid = l.vid and v.fs = $id ";
     $sql2    .= "   left outer join $fakeplayer u on u.uid = l.uid and u.fs = $id ";
 
@@ -3063,7 +3102,7 @@ sub show_fakelist {
     print "<div>";
 
     my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>' ) chk ";
-    $sql2a    .= " from art a join last l on a.x = l.x and a.y = l.y ";
+    $sql2a    .= " from $t_art a join last l on a.x = l.x and a.y = l.y ";
     $sql2a    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
 
     my $sql3a  = " where l.aid = 22 ";
@@ -3124,11 +3163,11 @@ sub show_art {
     print "DBG: ($ax, $ay) no $ano level $level name $name exec $exec set $setid note $note\n";
     if( $exec eq "add" ){
 	# add x,y,name, level
-	my $sql = "insert into art (x,y,name,level,note) values ($ax,$ay,$name,$level,\"$note\");";
+	my $sql = "insert into $t_art (x,y,name,level,note) values ($ax,$ay,$name,$level,\"$note\");";
 	$db->do($sql);
     } elsif( $setid > 0 ){
 	# set x,y
-	my $sql = "update art set x=$ax, y=$ay, no=$ano, note=\"$note\" where id=$setid;";
+	my $sql = "update $t_art set x=$ax, y=$ay, no=$ano, note=\"$note\" where id=$setid;";
 	$db->do($sql);
     }
 
@@ -3140,7 +3179,7 @@ sub show_art {
     # show list
     my @labels = qw(id name no grid village user ally cap x y no note set);
 
-    my $sql = "select a.id, a.x, a.y, a.name, a.bronz, a.level, gridlink(a.x,a.y) grid, l.village, l.user, l.alliance, case when c.x is not null then \"capital\" else \"\" end cap, no, note from art a join last l on a.x = l.x and a.y = l.y left outer join capital c on c.x = a.x and c.y = a.y  order by a.name, a.no, a.id;";
+    my $sql = "select a.id, a.x, a.y, a.name, a.bronz, a.level, gridlink(a.x,a.y) grid, l.village, l.user, l.alliance, case when c.x is not null then \"capital\" else \"\" end cap, no, note from $t_art a join last l on a.x = l.x and a.y = l.y left outer join capital c on c.x = a.x and c.y = a.y  order by a.name, a.no, a.id;";
     my $sth = do_sql($db,$sql);
     my $num_rows = $sth->rows();
 
@@ -3179,6 +3218,78 @@ sub show_art {
     # show_tail();
 }
 
+#
+# travel
+#
+
+sub show_form_target {
+    my($db, $cgi) = @_;
+
+    my $aid = $cgi->param("aid");
+    my $uid = $cgi->param("uid");
+    
+    print "Target: ";
+    print "<form name=target method=post action=/$script/travel>\n";
+    print "ALLY ID : <input type=text name=aid value=$aid>";
+    print " Player ID: <input type=text name=uid value=$uid>";
+    print "<input type=submit name=exec value=update>";
+    print "</form>";
+
+    return ($aid,$uid);
+}
+
+
+sub travel_show {
+    my($db, $cgi, $x,$y,$tsq,$vel) = @_;
+    
+    ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
+
+    show_form_sel($db, $x, $y, $vel, $tsq);
+    show_form_params($db, $x, $y, $vel, $tsq);
+    show_form($x,$y,$tsq,$vel);
+
+    register_srcdata($db, $x,$y,$tsq,$vel);
+    my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
+    $srcid = 1 if (!defined($srcid) || $srcid < 1);
+
+    # destination selection
+    
+    my ($target_aid,$target_uid) = show_form_target($db, $cgi);
+
+    #
+    # show alliance div
+    #
+    my $sth1 = do_sql($db,"select aid, alliance, sum(population) pop from last l group by aid, alliance order by sum(population) desc limit 20;");
+
+    print "<div style=\"float:left;\">";
+    show_data_table($sth1);
+    print "</div>";
+    
+    my $cond = "";
+    if( defined($target_uid) && $target_uid > 0 )  { $cond = " where uid = $target_uid "; }
+    elsif( defined($target_aid) && $target_aid > 0 ){ $cond = " where aid = $target_aid "; }
+    else {
+	$cond = " where aid = 56 "; 
+    }
+    
+    my $sql = "select round(travel(dist(l.x,l.y,$x,$y),3,20),2) hour, \
+                 gridlink(l.x,l.y) grid, usera(l.uid,l.user) player, l.village, l.population, l.uid, l.aid \
+               from last l $cond \
+               order by dist(l.x,l.y,$x,$y) asc; ";
+
+    my $sth = do_sql($db, $sql);
+
+    my $num_rows = $sth->rows;
+
+    if ( $num_rows < 0 ){
+	print "<p> failed to read data from the table $sktable.</p>\n";
+	return -1 ;
+    }
+    print "<div style=\"float:left;\">";
+    show_data_table($sth);
+    print "</div>";
+    print "<div style=\"clear: both;\"";
+}
 
 #
 # Main
@@ -3314,7 +3425,7 @@ if( $info =~ /show/ || $info eq "" ){
 } elsif ( $info =~ /fakenow\/filter\/filter\/(.*)/ ){
     # misc filter
     my $name = "filter";
-    my $value = $1; # fakelist, intime, capital, artifact
+    my $value = $1; # recommend, fakelist, intime, capital, artifact
     $inline = 1;
     my $db = open_db();
     inline_filter_filter($db, $cgi, $name,$value);
@@ -3385,6 +3496,11 @@ if( $info =~ /show/ || $info eq "" ){
 } elsif( $info =~ /^artifact/ ){
     my $db = open_db();
     show_art($db,$cgi);
+    close_db($db);
+} elsif( $info =~ /^travel/ ){
+    show_head("Travel calculator");
+    my $db = open_db();
+    travel_show($db,$cgi, $x, $y, $tsq, $vel);
     close_db($db);
 
 # others
