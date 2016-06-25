@@ -805,9 +805,15 @@ sub do_comment {
 
 sub show_form {
     my($x,$y,$tsq,$vel) = @_;
+    my $action = "/$script/show";
+    return show_form_action($x,$y,$tsq,$vel, $action);
+}
+
+sub show_form_action {
+    my($x,$y,$tsq,$vel, $action) = @_;
 
 #    print "送付元：";
-    print "<form name=pos method=post action=/$script/show>\n";
+    print "<form name=pos method=post action=$action>\n";
 
     print "x: <input type=text size=5 name=x value=$x>\n";
     print "y: <input type=text size=5 name=y value=$y>\n";
@@ -819,8 +825,15 @@ sub show_form {
     print "</form>\n";
 }
 
+
 sub show_form_sel {
     my($db,$x, $y, $vel,$tsq) = @_;
+    return show_form_sel_sub($db,$x, $y, $vel,$tsq, "/$script/show");
+}
+
+
+sub show_form_sel_sub {
+    my($db,$x, $y, $vel,$tsq, $action) = @_;
 
     # ally, player, village, vel, tsq
     my($uid,$user,$vid, $village, $aid,$alliance) = (-1,"",-1,"",-1,"");
@@ -834,7 +847,7 @@ sub show_form_sel {
     $sth->finish;
 
     print "送付元：";
-    print "<form style=\"float:left;\" name=loc method=post action=/$script/show>\n";
+    print "<form style=\"float:left;\" name=loc method=post action=$action>\n";
 
     print "<select name=ally onchange=ally_change()>\n";
 
@@ -882,8 +895,6 @@ sub show_form_params {
     # 
     # get parms from $srctable
     #
-    #
-
     my ($sid) = $db->selectrow_array("select id from $srctable where x = $x and y = $y and vel = $vel and tsq = $tsq;");
 
     $sid = 0 if (!defined($sid));
@@ -901,7 +912,6 @@ sub show_form_params {
     }
     print "</select>\n";
     print "";
-    print "</form>\n";
 }
 
 sub show_snip_form {
@@ -1972,9 +1982,10 @@ sub show_info {
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
     show_form_sel($db, $x, $y, $vel, $tsq);
+    print "<form method=post action=/$script/show>";
     show_form_params($db, $x, $y, $vel, $tsq);
+    print "</form>\n";
     show_form($x,$y,$tsq,$vel);
-
 
     register_srcdata($db, $x,$y,$tsq,$vel);
     my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
@@ -3224,13 +3235,13 @@ sub show_art {
 #
 
 sub show_form_target {
-    my($db, $cgi) = @_;
+    my($db, $cgi, $action) = @_;
 
     my $aid = $cgi->param("aid");
     my $uid = $cgi->param("uid");
     
     print "Target: ";
-    print "<form name=target method=post action=/$script/travel>\n";
+    print "<form name=target method=post action=$action>\n";
     print "ALLY ID : <input type=text name=aid value=$aid>";
     print " Player ID: <input type=text name=uid value=$uid>";
     print "<input type=submit name=exec value=update>";
@@ -3245,9 +3256,15 @@ sub travel_show {
     
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
-    show_form_sel($db, $x, $y, $vel, $tsq);
+    my $action = "/$script/travel";
+
+    show_form_sel_sub($db, $x, $y, $vel, $tsq, $action);
+
+    print "<form method=post action=$action>";
     show_form_params($db, $x, $y, $vel, $tsq);
-    show_form($x,$y,$tsq,$vel);
+    print "</form>";
+    
+    show_form_action($x, $y, $tsq, $vel, $action);
 
     register_srcdata($db, $x,$y,$tsq,$vel);
     my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
@@ -3255,7 +3272,7 @@ sub travel_show {
 
     # destination selection
     
-    my ($target_aid,$target_uid) = show_form_target($db, $cgi);
+    my ($target_aid,$target_uid) = show_form_target($db, $cgi, $action);
 
     #
     # show alliance div
@@ -3273,13 +3290,12 @@ sub travel_show {
 	$cond = " where aid = 56 "; 
     }
     
-    my $sql = "select round(travel(dist(l.x,l.y,$x,$y),3,20),2) hour, \
+    my $sql = "select round(travel(dist(l.x,l.y,$x,$y),$vel,$tsq),2) hour, \
                  gridlink(l.x,l.y) grid, usera(l.uid,l.user) player, l.village, l.population, l.uid, l.aid \
                from last l $cond \
                order by dist(l.x,l.y,$x,$y) asc; ";
 
     my $sth = do_sql($db, $sql);
-
     my $num_rows = $sth->rows;
 
     if ( $num_rows < 0 ){

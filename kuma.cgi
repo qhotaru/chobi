@@ -3128,7 +3128,7 @@ sub show_fakelist {
 }
 
 sub art_form {
-    print "<form name=art method=post action=\"/$script/art\">";
+    print "<form name=art method=post action=\"/$script/artifact\">";
 
     print "<table border=0>";
     print "<tr>";
@@ -3160,10 +3160,9 @@ sub show_art {
     my $exec  = $cgi->param("exec");
     my $setid = $cgi->param("set");
 
-    print "DBG: ($ax, $ay) no $ano level $level name $name exec $exec set $setid note $note\n";
     if( $exec eq "add" ){
 	# add x,y,name, level
-	my $sql = "insert into $t_art (x,y,name,level,note) values ($ax,$ay,$name,$level,\"$note\");";
+	my $sql = "insert into $t_art (x,y,name,level,note) values ($ax,$ay,\"$name\",$level,\"$note\");";
 	$db->do($sql);
     } elsif( $setid > 0 ){
 	# set x,y
@@ -3173,7 +3172,9 @@ sub show_art {
 
     show_head("Artifact");
 
+    # print "DBG: ($ax, $ay) no $ano level $level name $name exec $exec set $setid note $note\n";
     # show form for add
+    
     art_form($cgi);
 
     # show list
