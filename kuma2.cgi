@@ -352,11 +352,9 @@ sub show_head {
 	$title = $intitle;
     }
     $title = encode('utf-8', $title); # for output
-
     #
     # show head
     #
-    
     # handle auth
     if ( defined($g_cookie) ){
 	print "Set-Cookie: $g_cookie\n";
@@ -378,6 +376,7 @@ sub show_head {
 
     show_script();
 
+    print "<div class=top>";
     print "<h1> $title </h1>\n";
 
     my %menulabels = (
@@ -387,7 +386,8 @@ sub show_head {
 	);
     
 
-    #####
+    ### menu area
+    print "<div class=menu>";
     print "<table><tr>";
     my @menuitems = qw(-- show atinfo armlog fakenow fakelist artifact travel -- login ||other_sites ,narusa,http://153.126.160.254/defence ||load_narusa load_narusa ||for_debug sk update_atinfo ||);
 
@@ -412,6 +412,8 @@ sub show_head {
 	}
     }
     print "</tr></table>\n";
+    print "</div>";
+    print "</div>";
 }
 
 sub show_tail {
@@ -812,17 +814,21 @@ sub show_form {
 sub show_form_action {
     my($x,$y,$tsq,$vel, $action) = @_;
 
-#    print "送付元：";
-    print "<form name=pos method=post action=$action>\n";
+    #    print "送付元：";
+    if( $action ){
+	print "<form name=pos method=post action=$action>\n";
+    }
 
-    print "x: <input type=text size=5 name=x value=$x>\n";
-    print "y: <input type=text size=5 name=y value=$y>\n";
-    print "Velocity: <input type=text size=5 name=vel value=$vel>\n";
-    print "Tournament Square Level: <input type=text size=5 name=tsq value=$tsq>\n";
+    print "x: <input id=xx type=text size=5 name=x value=$x>\n";
+    print "y: <input id~yy type=text size=5 name=y value=$y>\n";
+    print "Velocity: <input id=vel type=text size=5 name=vel value=$vel>\n";
+    print "Tournament Square Level: <input id=tsq type=text size=5 name=tsq value=$tsq>\n";
 
     print "<input type=submit name=go value=show>\n";
 
-    print "</form>\n";
+    if( $action ){
+	print "</form>\n";
+    }
 }
 
 
@@ -846,10 +852,12 @@ sub show_form_sel_sub {
     }
     $sth->finish;
 
+    if( $action ){
+	print "<form style=\"float:left;\" name=loc method=post action=$action>\n";
+    }
     print "送付元：";
-    print "<form style=\"float:left;\" name=loc method=post action=$action>\n";
 
-    print "<select name=ally onchange=ally_change()>\n";
+    print "<select name=ally onclick=ally_change()>\n";
 
     $sth = do_sql($db, "select aid,alliance from $xtable where aid > 0 group by alliance order by sum(population) desc limit 10;\n");
     my $num = $sth->rows;
@@ -861,7 +869,7 @@ sub show_form_sel_sub {
     }
     print "</select>\n";
 
-    print "<select name=player onchange=player_change()>\n";
+    print "<select name=player onclick=player_change()>\n";
     if( $uid > 0 ){
 	$sth = do_sql($db, "select uid,user from $xtable where aid = $aid group by uid,user;");
 	my $num = $sth->rows;
@@ -872,11 +880,10 @@ sub show_form_sel_sub {
 	}
     }
     print "</select>\n";
-
     #
     # X,Y,Vel,TSQ Selector
     #
-    print "<select name=village onchange=village_change()>\n";
+    print "<select name=village onclick=village_change()>\n";
     if( $vid > 0 && $uid > 0 ){
 	$sth = do_sql($db, "select vid,village from $xtable where uid = $uid;");
 	my $num = $sth->rows;
@@ -887,19 +894,21 @@ sub show_form_sel_sub {
 	}
     }
     print "</select>\n";
-    print "</form>\n";
+    if( $action ){
+	print "</form>\n";
+    }
 }
 
 sub show_form_params {
     my ($db, $x, $y, $vel, $tsq) = @_;
     # 
-    # get parms from $srctable
+    # get params from $srctable
     #
     my ($sid) = $db->selectrow_array("select id from $srctable where x = $x and y = $y and vel = $vel and tsq = $tsq;");
 
     $sid = 0 if (!defined($sid));
 
-    print "<select name=params onchange=parasel_change(this)>\n";
+    print "<select name=params onclick=parasel_change(this)>\n";
 
     my $sth = do_sql($db, "select id, x, y, vel, tsq from $srctable;");
     my $num = $sth->rows;
@@ -1272,7 +1281,7 @@ sub sortable_control {
     print <<EOT
 	<div id=\"$contid\" class="controls_class">
 		<div id=\"$perpageid\" class="perpage_class">
-			<select onchange="$svar.size(this.value)">
+			<select onclick="$svar.size(this.value)">
 			<option value="5">5</option>
 				<option value="10">10</option>
 				<option value="20" selected="selected">20</option>
@@ -1501,7 +1510,7 @@ sub show_fakenow {
     my @filters = qw(all recommend fakelist intime artifact capital);
     print "<tr><th>Filters</th><th>chk</th></tr>\n";
     foreach my $filter (@filters){
-	print "<tr><td>$filter</td><td><input type=checkbox name=filter value=$filter checked onchange=\"filter_change(this)\"></td></tr>\n";
+	print "<tr><td>$filter</td><td><input type=checkbox name=filter value=$filter checked onclick=\"filter_change(this)\"></td></tr>\n";
     }
     print "</table>";
     print "</div>";  # end category div
@@ -1510,7 +1519,7 @@ sub show_fakenow {
     #
     print "<div>";   # begin players div
     # players list: username checkbox
-    $sql = "select user, concat('<input type=checkbox name=player value=', uid, ' onchange=filter_change(this)>') chk from last l where aid = 22 group by uid order by sum(population) desc;";
+    $sql = "select user, concat('<input type=checkbox name=player value=', uid, ' onclick=filter_change(this)>') chk from last l where aid = 22 group by uid order by sum(population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
     print "</div>\n"; # end players div
@@ -1981,11 +1990,13 @@ sub show_info {
     my $cgi = CGI->new();
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
-    show_form_sel($db, $x, $y, $vel, $tsq);
-    print "<form method=post action=/$script/show>";
+    print "<form name=loc method=post action=/$script/show>";
+
+    show_form_sel_sub($db, $x, $y, $vel, $tsq);
     show_form_params($db, $x, $y, $vel, $tsq);
+    show_form_action($x,$y,$tsq,$vel);
+
     print "</form>\n";
-    show_form($x,$y,$tsq,$vel);
 
     register_srcdata($db, $x,$y,$tsq,$vel);
     my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
@@ -3054,12 +3065,9 @@ sub show_fakelist {
     print "<input type=submit name=exec value=\"$msg{fix}\">";
     print "<input type=submit name=exec value=\"$msg{list}\">";
     print "</p>";
-
     print "</div>";
-
     #
     # left div
-    #
     print "<div style=\"float:left;vertical-align:top;\">";
     # button
     print "<p><input type=submit name=exec value=\"$msg{set_player}\"></p>";
@@ -3068,22 +3076,15 @@ sub show_fakelist {
     $sql = "select l.user, concat('<input type=checkbox name=player value=', l.uid, case p.enabled when 1 then ' checked' else '' end, '>') chk from last l left outer join $fakeplayer p on l.uid = p.uid and p.fs = $id where l.aid = 22 group by l.uid order by sum(l.population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
-
     print "</div>\n";
 
-    #
-    # SPACER
-    #
-    print "<div style=\"float:left;width=20px;\"></div>";
+    print "<div style=\"float:left;width=20px;\"></div>"; # SPACER
 
-    #
     # right div
-    #
     print "<div style=\"float:left;vertical-align:top;\">";
     print "<p><input type=submit name=exec value=\"$msg{set_village}\"></p>";
-    #
+
     # show villages : conditions:  uid in $fakeplayer  or  vid in $fakevil
-    #
     print "<div>";
 
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
@@ -3109,27 +3110,38 @@ sub show_fakelist {
 
     print "<hr>";
 
-    # show artifact villages
+    # show artifact
     print "<div>";
 
-    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>' ) chk ";
-    $sql2a    .= " from $t_art a join last l on a.x = l.x and a.y = l.y ";
-    $sql2a    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
+    my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start ";
+
+    $sql1 .= ", round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid ";
+    $sql1 .= ", l.user player, l.village,l.population pop ";
+    $sql1 .= ", iscapitals(l.x,l.y) cap ";
+    $sql1 .= ", a.name art ";
+    # $sql1 .= ", silver(l.uid) silver "; # This made stall.
+
+    my $sql2a  = ", concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked ' else '' end, '>' ) chk ";
 
     my $sql3a  = " where l.aid = 22 ";
        $sql3a .= " group by l.vid ";
-    $sql3a    .= " order by duration desc;";
+       $sql3a .= " order by duration desc;";
 
-    $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    my $sql2f  = " from $t_art a join last l on a.x = l.x and a.y = l.y ";
+    $sql2f    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
+    my $sql3a  = " where l.aid = 22 ";
+    
+    # print "DBG: $sql1 $sql2f";
+    # $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    $sth = do_sql($db, "$sql1 $sql2a $sql2f $sql3a ;");
     print "Artifacts.";
     show_data_table($sth);
 
     print "</div>";    # end of artifact
+    print "<hr>";
 
     fakelist_show_capital($db, $x,$y,$vel,$tsq, $arrival, $id, "Captails without artifact not in fakelist.");
-
     print "</div>\n";  # end of left
-
     print "</form>\n";
 
     # bottom
@@ -3239,13 +3251,19 @@ sub show_form_target {
 
     my $aid = $cgi->param("aid");
     my $uid = $cgi->param("uid");
-    
+
+    if( $action ){
+	print "<form name=target method=post action=$action>\n";
+    }
+
     print "Target: ";
-    print "<form name=target method=post action=$action>\n";
     print "ALLY ID : <input type=text name=aid value=$aid>";
     print " Player ID: <input type=text name=uid value=$uid>";
     print "<input type=submit name=exec value=update>";
-    print "</form>";
+
+    if( $action ){
+	print "</form>";
+    }
 
     return ($aid,$uid);
 }
@@ -3257,13 +3275,12 @@ sub travel_show {
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
     my $action = "/$script/travel";
+    print "<div clas=param>";
+    print "<form name=loc method=post action=$action>";
 
-    show_form_sel_sub($db, $x, $y, $vel, $tsq, $action);
-
-    print "<form method=post action=$action>";
+    show_form_sel_sub($db, $x, $y, $vel, $tsq );
     show_form_params($db, $x, $y, $vel, $tsq);
-    print "</form>";
-    
+
     show_form_action($x, $y, $tsq, $vel, $action);
 
     register_srcdata($db, $x,$y,$tsq,$vel);
@@ -3271,9 +3288,11 @@ sub travel_show {
     $srcid = 1 if (!defined($srcid) || $srcid < 1);
 
     # destination selection
-    
-    my ($target_aid,$target_uid) = show_form_target($db, $cgi, $action);
+    print "<br>";
+    my ($target_aid,$target_uid) = show_form_target($db, $cgi);
 
+    print "</form>";
+    print "</div>";
     #
     # show alliance div
     #
@@ -3291,8 +3310,11 @@ sub travel_show {
     }
     
     my $sql = "select round(travel(dist(l.x,l.y,$x,$y),$vel,$tsq),2) hour, \
-                 gridlink(l.x,l.y) grid, usera(l.uid,l.user) player, l.village, l.population, l.uid, l.aid \
-               from last l $cond \
+                 gridlink(l.x,l.y) grid, usera(l.uid,l.user) player, \
+                 l.village, l.population, l.uid, l.aid ,\
+                 case when c.x is null then '' else 'cap' end cap, \
+                 a.name art \
+               from last l left outer join $t_capital c on l.x=c.x and l.y = c.y left outer join $t_art a on l.x = a.x and l.y = a.y $cond \
                order by dist(l.x,l.y,$x,$y) asc; ";
 
     my $sth = do_sql($db, $sql);

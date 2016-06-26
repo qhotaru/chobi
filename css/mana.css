@@ -24,6 +24,16 @@ div.datapane {
     width: 60%;
 }
 
+div.top  {
+    background-color: #e0e0e0e;
+}
+div.menu {
+    background-color: #f0f0f0;
+}
+div.param {
+    background-color: #e0e0e0e;
+}
+
 /* table {background-color: #c0c0c0; } */
 
 

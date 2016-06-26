@@ -99,19 +99,31 @@ function filter_change (e){
        var vel = parama[3].replace(/^[A-Za-z]+=/,"");
        var tsq = parama[4].replace(/^[A-Za-z]+=/,"");
        
-       document.pos.x.value   = parama[1];
-       document.pos.y.value   = parama[2];
+       document.loc.x.value   = parama[1];
+       document.loc.y.value   = parama[2];
 
-       document.pos.vel.value = vel;
-       document.pos.tsq.value = tsq;
+       document.loc.vel.value = vel;
+       document.loc.tsq.value = tsq;
     } // function parasel_change
-    
-    function player_change(){
-       var ix   = document.loc.player.selectedIndex;
-       var name = document.loc.player.options[ix].value;
 
-       var xhr = new XMLHttpRequest();
-       var url = "http://" + "$httphost" + "/$cpath$prog/player/" + name;
+function genurl(item){
+    var url   = window.location.href;
+    var host  = window.location.host;
+    var pname = window.location.pathname;
+    var pi    = pname.split("/");
+    var script = pi[1];
+    return "http://" + host + "/" + script + item;
+}
+
+    function player_change(){
+	var ix   = document.loc.player.selectedIndex;
+	var name = document.loc.player.options[ix].value;
+
+	var xhr = new XMLHttpRequest();
+	// var url = "http://" + "$httphost" + "/$cpath$prog/player/" + name;
+
+	// var url = window.location.href + "/player/" + name;
+	var url = genurl("/player/" + name);
 
        xhr.onreadystatechange = function (){
 	   switch(xhr.readyState){
@@ -134,14 +146,14 @@ function filter_change (e){
        xhr.send();
     } // function player_change
 
-
-	
-    function village_change(){
+function village_change(){
        var ix   = document.loc.village.selectedIndex;
        var name = document.loc.village.options[ix].value;
 
        var xhr = new XMLHttpRequest();
-       var url = "http://" + "$httphost" + "/$cpath$prog/village/" + name;  // name = vid
+	// var url = "http://" + "$httphost" + "/$cpath$prog/village/" + name;  // name = vid
+    // var url = window.location.href + "/village/" + name;  // name = vid
+    var url = genurl("/village/" + name);
 
        xhr.onreadystatechange = function (){
 	   switch(xhr.readyState){
@@ -153,8 +165,8 @@ function filter_change (e){
 		       // alert("recv:" + xhr.responseText);
 		       // update_player(xhr.responseText);
 		       var posa = xhr.responseText.split(",");
-		       document.pos.x.value = posa[0];
-		       document.pos.y.value = posa[1];
+		       document.loc.x.value = posa[0];
+		       document.loc.y.value = posa[1];
 		   } else {// request failed
 		       alert("other status response:" + xhr.status);
 		   } // if
@@ -174,7 +186,9 @@ function filter_change (e){
        var name = document.loc.ally.options[ix].value;
 
        var xhr = new XMLHttpRequest();
-       var url = "http://" + "$httphost" + "/$cpath$prog/ally/" + name;
+	// var url = "http://" + "$httphost" + "/$cpath$prog/ally/" + name;
+	// var url = window.location.href + "/ally/" + name;
+	var url = genurl("/ally/" + name);
 
        xhr.onreadystatechange = function (){
 	   switch(xhr.readyState){
