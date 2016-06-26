@@ -1113,17 +1113,17 @@ sub dnormal {
 #
 # Functions for fakelist
 #
-# 1. Set target arrival
-# 2. Set Source
-# 3. Set players
-# 4. Set village
-# 5. fix  : set fixed mark
-# 6. next : create next fakelist
+#   1. Set target arrival
+#   2. Set Source
+#   3. Set players
+#   4. Set village
+#   5. fix  : set fixed mark
+#   6. next : create next fakelist
 #
 # Functions for fakenow
 #
-# a. reserve
-# b. fired
+#   a. reserve
+#   b. fired
 #
 # fakenow table
 #   create table fakenow (id serial, rev int, arrival datetime, note varchar(256) );
@@ -1284,7 +1284,7 @@ sub sortable_control {
 			<select onclick="$svar.size(this.value)">
 			<option value="5">5</option>
 				<option value="10">10</option>
-				<option value="20" selected="selected">20</option>
+				<option value="30" selected="selected">30</option>
 				<option value="50">50</option>
 				<option value="100">100</option>
 			</select>
@@ -1318,7 +1318,7 @@ sub sortable_init {
 	$svar.evensel = 'evenselected'; //selected column even class
 	$svar.oddsel = 'oddselected'; //selected column odd class
 	$svar.paginate = true ; //toggle for pagination logic
-	$svar.pagesize = 20 ; //toggle for pagination logic
+	$svar.pagesize = 30 ; //toggle for pagination logic
 	
 	$svar.currentid = \'$curid\'; //current page id
 	$svar.limitid = \'$pagelimitid\'; //page limit id
@@ -1355,7 +1355,7 @@ sub fakenow_show {
     my $title = get_div_title($db, $filtername, $filtervalue);
 
     my $sqlvil = $selc . $fromc . $condc;
-    # print "$sqlvil\n";
+    # print "DBG: $sqlvil\n";
     
     print "<h3>$title</h3>";
 
@@ -1371,7 +1371,8 @@ sub fakenow_show {
 
 sub get_recommend {
     my ($db, $id, $nart, $nvil, $selc, $rest) = @_;
-	
+
+    # fakevil
     my $uf = " $selc from $fakevil f join last l on l.vid = f.vid \
                left outer join $t_capital c on c.x = l.x and c.y = l.y \
                left outer join $t_art a     on a.x = l.x and a.y = l.y \
@@ -1381,10 +1382,12 @@ sub get_recommend {
     if( !defined($nvil) ){$nvil = 3;}
     $nart = 5; $nvil = 2;
 
+    # artifact
     my $ua = " $selc \
                from $t_art a join last l on a.x = l.x and a.y = l.y \ 
                  left outer join $t_capital c on c.x = l.x and c.y = l.y \
                  left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               where l.aid = ($tg_aidlist) \
                order by abs($rest) asc \
                limit $nart ";
 
@@ -1714,7 +1717,7 @@ sub fakelist_show_capital {
     my $sql1  = "select df(date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second )) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " usera(l.uid,l.user) player, l.village, l.population pop, ";
-    $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
+    $sql1 .= " iscapitals(l.x,l.y) cap, a.name art, silverg(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, '>' ) chk ";
     $sql2    .= " from capital c join last l on c.x=l.x and c.y=l.y left outer join $t_art a on l.x = a.x and l.y = a.y ";
@@ -2459,7 +2462,7 @@ sub get_selc {
     my $selc  = " select df(date_sub(\'$arrival\', interval round($travel * 3600,0) second )) start, ";
     $selc    .= "   round($travel,2) duration, round($dist,2) dist, gridlink(l.x,l.y) grid, ";
     $selc    .= "   usera(l.uid,l.user) player, l.village,l.population pop,";
-    $selc    .= "   iscapitals(l.x,l.y) cap, a.name art, silver(l.uid) silver, ";
+    $selc    .= "   iscapitals(l.x,l.y) cap, a.name art, silverg(l.uid) silver, ";
     $selc    .= "   f.reserved, f.fired, case when f.enabled > 0 then 'Y' else '' end FL, ";
     $selc    .= "   concat('<input type=checkbox name=village value=', l.vid, '>' ) chk,  ";
     $selc    .= "   case when $intime then '' else 'Late' end late , ";
@@ -3090,7 +3093,7 @@ sub show_fakelist {
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,l.population pop, ";
-    $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silver(l.uid) silver, ";
+    $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silverg(l.uid) silver, ";
 
     my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>') chk ";
     $sql2    .= " from last l left outer join $t_art a on l.x = a.x and l.y = a.y ";
@@ -3119,7 +3122,7 @@ sub show_fakelist {
     $sql1 .= ", l.user player, l.village,l.population pop ";
     $sql1 .= ", iscapitals(l.x,l.y) cap ";
     $sql1 .= ", a.name art ";
-    # $sql1 .= ", silver(l.uid) silver "; # This made stall.
+    $sql1 .= ", silverg(l.uid) silver "; # This made stall.
 
     my $sql2a  = ", concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked ' else '' end, '>' ) chk ";
 

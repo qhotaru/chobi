@@ -1284,7 +1284,7 @@ sub sortable_control {
 			<select onclick="$svar.size(this.value)">
 			<option value="5">5</option>
 				<option value="10">10</option>
-				<option value="20" selected="selected">20</option>
+				<option value="30" selected="selected">30</option>
 				<option value="50">50</option>
 				<option value="100">100</option>
 			</select>
@@ -1318,7 +1318,7 @@ sub sortable_init {
 	$svar.evensel = 'evenselected'; //selected column even class
 	$svar.oddsel = 'oddselected'; //selected column odd class
 	$svar.paginate = true ; //toggle for pagination logic
-	$svar.pagesize = 20 ; //toggle for pagination logic
+	$svar.pagesize = 30 ; //toggle for pagination logic
 	
 	$svar.currentid = \'$curid\'; //current page id
 	$svar.limitid = \'$pagelimitid\'; //page limit id
@@ -1371,7 +1371,8 @@ sub fakenow_show {
 
 sub get_recommend {
     my ($db, $id, $nart, $nvil, $selc, $rest) = @_;
-	
+
+    # fakevil
     my $uf = " $selc from $fakevil f join last l on l.vid = f.vid \
                left outer join $t_capital c on c.x = l.x and c.y = l.y \
                left outer join $t_art a     on a.x = l.x and a.y = l.y \
@@ -1381,10 +1382,12 @@ sub get_recommend {
     if( !defined($nvil) ){$nvil = 3;}
     $nart = 5; $nvil = 2;
 
+    # artifact
     my $ua = " $selc \
                from $t_art a join last l on a.x = l.x and a.y = l.y \ 
                  left outer join $t_capital c on c.x = l.x and c.y = l.y \
                  left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
+               where l.aid = ($tg_aidlist) \
                order by abs($rest) asc \
                limit $nart ";
 
