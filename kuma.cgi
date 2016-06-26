@@ -3065,12 +3065,9 @@ sub show_fakelist {
     print "<input type=submit name=exec value=\"$msg{fix}\">";
     print "<input type=submit name=exec value=\"$msg{list}\">";
     print "</p>";
-
     print "</div>";
-
     #
     # left div
-    #
     print "<div style=\"float:left;vertical-align:top;\">";
     # button
     print "<p><input type=submit name=exec value=\"$msg{set_player}\"></p>";
@@ -3079,22 +3076,15 @@ sub show_fakelist {
     $sql = "select l.user, concat('<input type=checkbox name=player value=', l.uid, case p.enabled when 1 then ' checked' else '' end, '>') chk from last l left outer join $fakeplayer p on l.uid = p.uid and p.fs = $id where l.aid = 22 group by l.uid order by sum(l.population) desc;";
     my $sth = do_sql($db, $sql);
     show_data_table($sth);
-
     print "</div>\n";
 
-    #
-    # SPACER
-    #
-    print "<div style=\"float:left;width=20px;\"></div>";
+    print "<div style=\"float:left;width=20px;\"></div>"; # SPACER
 
-    #
     # right div
-    #
     print "<div style=\"float:left;vertical-align:top;\">";
     print "<p><input type=submit name=exec value=\"$msg{set_village}\"></p>";
-    #
+
     # show villages : conditions:  uid in $fakeplayer  or  vid in $fakevil
-    #
     print "<div>";
 
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
@@ -3120,27 +3110,38 @@ sub show_fakelist {
 
     print "<hr>";
 
-    # show artifact villages
+    # show artifact
     print "<div>";
 
-    my $sql2a  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>' ) chk ";
-    $sql2a    .= " from $t_art a join last l on a.x = l.x and a.y = l.y ";
-    $sql2a    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
+    my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start ";
+
+    $sql1 .= ", round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid ";
+    $sql1 .= ", l.user player, l.village,l.population pop ";
+    $sql1 .= ", iscapitals(l.x,l.y) cap ";
+    $sql1 .= ", a.name art ";
+    # $sql1 .= ", silver(l.uid) silver "; # This made stall.
+
+    my $sql2a  = ", concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked ' else '' end, '>' ) chk ";
 
     my $sql3a  = " where l.aid = 22 ";
        $sql3a .= " group by l.vid ";
-    $sql3a    .= " order by duration desc;";
+       $sql3a .= " order by duration desc;";
 
-    $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    my $sql2f  = " from $t_art a join last l on a.x = l.x and a.y = l.y ";
+    $sql2f    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
+    my $sql3a  = " where l.aid = 22 ";
+    
+    # print "DBG: $sql1 $sql2f";
+    # $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    $sth = do_sql($db, "$sql1 $sql2a $sql2f $sql3a ;");
     print "Artifacts.";
     show_data_table($sth);
 
     print "</div>";    # end of artifact
+    print "<hr>";
 
     fakelist_show_capital($db, $x,$y,$vel,$tsq, $arrival, $id, "Captails without artifact not in fakelist.");
-
     print "</div>\n";  # end of left
-
     print "</form>\n";
 
     # bottom
