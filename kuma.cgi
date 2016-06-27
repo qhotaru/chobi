@@ -3285,9 +3285,7 @@ sub travel_show {
     my($db, $cgi, $x,$y,$tsq,$vel) = @_;
     
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
-
     my $action = "/$script/travel";
-
     #
     # form
     #
@@ -3333,7 +3331,7 @@ sub travel_show {
 	    $cond = " where l.aid in ( $target_aid ) ";
 	}
     } else {
-	$cond = " where aid = 56 "; 
+	$cond = " where l.aid in ($tg_aidlist) and c.x is not null "; 
     }
     
     my $sql = "select round(travel(dist(l.x,l.y,$x,$y),$vel,$tsq),2) hour, \
