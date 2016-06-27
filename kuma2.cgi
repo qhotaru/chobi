@@ -8,6 +8,7 @@
 # 2. add fakelist now
 # 3. add recommend
 # 4. fix broken travel
+# 5. remove FL from recommend in fakenow
 #
 # $Id$
 #
@@ -1370,6 +1371,11 @@ sub fakenow_show {
     return 0;
 }
 
+# get_recommend()
+#
+# 1. artifact
+# 2. villages in fakeplayers
+#
 sub get_recommend {
     my ($db, $id, $nart, $nvil, $selc, $rest) = @_;
 
@@ -1388,7 +1394,7 @@ sub get_recommend {
                from $t_art a join last l on a.x = l.x and a.y = l.y \ 
                  left outer join $t_capital c on c.x = l.x and c.y = l.y \
                  left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
-               where l.aid = ($tg_aidlist) \
+               where l.aid = ($tg_aidlist) and f.vid is null \
                order by abs($rest) asc \
                limit $nart ";
 
@@ -1397,10 +1403,10 @@ sub get_recommend {
                    join $t_capital c on c.x = l.x and c.y = l.y \
                    left outer join $t_art a on a.x = l.x and a.y = l.y \
                    left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
-               where f.vid is null and p.uid is not null and (c.x is not null or a.x is not null )";
+               where f.vid is null and p.uid is not null \
+                   and (c.x is not null or a.x is not null )";
 
     my @uva = ();
-
     
     my $sth = do_sql($db, "select uid from $fakeplayer where fs = $id;");
     my $nrows = $sth->rows();
@@ -1410,7 +1416,7 @@ sub get_recommend {
                  left outer join $t_capital c on c.x = l.x and c.y = l.y \
                  left outer join $t_art a on a.x = l.x and a.y = l.y \
                  left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
-               where p.uid = $uid \
+               where p.uid = $uid and f.vid is null \
                  and c.x is null and a.x is null \
                order by abs($rest) asc limit $nvil ";
 	push @uva, "($uv)";
@@ -1421,11 +1427,13 @@ sub get_recommend {
                  join $t_capital c on c.x = l.x and c.y = l.y \
                  left outer join $t_art a on a.x = l.x and a.y = l.y \
                  left outer join $fakevil f on f.vid = l.vid and f.fs = $id \
-               where p.uid is not null and ( c.x is null and a.x is null ) \
+               where p.uid is not null and f.vid is null and ( c.x is null and a.x is null ) \
                order by abs($rest) asc limit $nvil ";
 
     # return "$uca";
-    return "($uf) union ($ua) union ($uca) union $uvlist";
+    # fakelist, artifact, capital and village in fakeplayers
+    return "($ua) union ($uca) union $uvlist";
+    # return "($uf) union ($ua) union ($uca) union $uvlist";
 }
 
 #
