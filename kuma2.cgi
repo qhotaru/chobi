@@ -7,6 +7,7 @@
 # 1. add comment
 # 2. add fakelist now
 # 3. add recommend
+# 4. fix broken travel
 #
 # $Id$
 #
@@ -3260,8 +3261,8 @@ sub show_form_target {
     }
 
     print "Target: ";
-    print "ALLY ID : <input type=text name=aid value=$aid>";
-    print " Player ID: <input type=text name=uid value=$uid>";
+    print "ALLY ID : <input type=text size=5 name=aid value=$aid>";
+    print " Player ID: <input type=text size=5 name=uid value=$uid>";
     print "<input type=submit name=exec value=update>";
 
     if( $action ){
@@ -3278,37 +3279,52 @@ sub travel_show {
     ($x,$y) = get_location_by_login($db, $cgi, $g_login, $x, $y);
 
     my $action = "/$script/travel";
+
+    #
+    # form
+    #
     print "<div clas=param>";
     print "<form name=loc method=post action=$action>";
-
     show_form_sel_sub($db, $x, $y, $vel, $tsq );
     show_form_params($db, $x, $y, $vel, $tsq);
-
-    show_form_action($x, $y, $tsq, $vel, $action);
-
+    # show_form_action($x, $y, $tsq, $vel, $action);
+    show_form_action($x, $y, $tsq, $vel);
     register_srcdata($db, $x,$y,$tsq,$vel);
     my $srcid = get_id_srcdata($db, $x,$y,$tsq,$vel);
     $srcid = 1 if (!defined($srcid) || $srcid < 1);
-
     # destination selection
     print "<br>";
     my ($target_aid,$target_uid) = show_form_target($db, $cgi);
-
+    print "c after ALLY_ID will show only capita. Example: 22c";
     print "</form>";
     print "</div>";
     #
     # show alliance div
     #
     my $sth1 = do_sql($db,"select aid, alliance, sum(population) pop from last l group by aid, alliance order by sum(population) desc limit 20;");
-
     print "<div style=\"float:left;\">";
     show_data_table($sth1);
     print "</div>";
     
     my $cond = "";
-    if( defined($target_uid) && $target_uid > 0 )  { $cond = " where uid = $target_uid "; }
-    elsif( defined($target_aid) && $target_aid > 0 ){ $cond = " where aid = $target_aid "; }
-    else {
+    if( defined($target_uid) && $target_uid > 0 )   { 
+	# if( $target_uid =~ /^(\d+)\s*[Cc]\s*$/ ){
+	if( $target_uid =~ /^(\d+)\s*[Cc]\s*$/ ){
+	    $target_uid = substr($target_uid, 0, length($target_uid)-1);
+	    # $target_uid = $1;
+	    $cond = " where c.x is not nul ";
+	    $cond .= " and l.uid in ( $target_uid ) ";
+	} else {
+	    $cond = " where l.uid in ( $target_uid ) ";
+	}
+    } elsif( defined($target_aid) && $target_aid > 0 ){
+	if( $target_aid =~ /^(\d+)\s*[Cc]\s*$/ ){
+	    $target_aid = substr($target_aid, 0, length($target_aid)-1);
+	    $cond = " where l.aid in ( $target_aid ) and c.x is not null "; 
+	} else {
+	    $cond = " where l.aid in ( $target_aid ) ";
+	}
+    } else {
 	$cond = " where aid = 56 "; 
     }
     
@@ -3324,7 +3340,7 @@ sub travel_show {
     my $num_rows = $sth->rows;
 
     if ( $num_rows < 0 ){
-	print "<p> failed to read data from the table $sktable.</p>\n";
+	print "<p> failed to read data from the table ($target_aid, $target_uid).</p>\n";
 	return -1 ;
     }
     print "<div style=\"float:left;\">";
