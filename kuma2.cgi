@@ -3099,6 +3099,8 @@ sub show_fakelist {
     # show villages : conditions:  uid in $fakeplayer  or  vid in $fakevil
     print "<div>";
 
+    print "selected.";
+
     my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
     $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
     $sql1 .= " l.user player, l.village,l.population pop, ";
@@ -3109,14 +3111,39 @@ sub show_fakelist {
     $sql2    .= "   left outer join $fakevil    v on v.vid = l.vid and v.fs = $id ";
     $sql2    .= "   left outer join $fakeplayer u on u.uid = l.uid and u.fs = $id ";
 
-    my $sql3  = " where l.aid = 22 ";
-       $sql3 .= " and ( (u.uid is not null ) or (v.vid is not null) )";
+    my $sql3  = " where l.aid in ($tg_aidlist) ";
+       $sql3 .= " and ( v.vid is not null )";
        $sql3 .= " group by l.vid ";
        $sql3 .= " order by duration desc ;";
 
     $sth = do_sql($db, $sql1 . $sql2 . $sql3);
 
-    print "Selected and userlist.";
+    show_data_table($sth);
+    print "</div>";
+
+    print "<hr>";
+
+    # players
+    print "<div>";
+
+    my $sql1  = "select date_sub(\'$arrival\', interval round(travel(dist($x,$y,l.x,l.y), $vel, $tsq) * 3600,0) second ) start, ";
+    $sql1 .= " round(travel(dist($x,$y,l.x,l.y), $vel, $tsq),2) duration, round(dist($x,$y,l.x,l.y),2) dist, gridlink(l.x,l.y) grid, ";
+    $sql1 .= " l.user player, l.village,l.population pop, ";
+    $sql1 .= " iscapitals(l.x,l.y) cap, case when a.name is null then '' else a.name end art, silverg(l.uid) silver, ";
+
+    my $sql2  = " concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked' else '' end, '>') chk ";
+    $sql2    .= " from last l left outer join $t_art a on l.x = a.x and l.y = a.y ";
+    $sql2    .= "   left outer join $fakevil    v on v.vid = l.vid and v.fs = $id ";
+    $sql2    .= "   left outer join $fakeplayer u on u.uid = l.uid and u.fs = $id ";
+
+    my $sql3  = " where l.aid in ($tg_aidlist) ";
+       $sql3 .= " and ( (u.uid is not null ) and (v.vid is null) )";
+       $sql3 .= " group by l.vid ";
+       $sql3 .= " order by duration desc ;";
+
+    $sth = do_sql($db, $sql1 . $sql2 . $sql3);
+
+    print "players.";
     show_data_table($sth);
     print "</div>";
 
@@ -3131,20 +3158,17 @@ sub show_fakelist {
     $sql1 .= ", l.user player, l.village,l.population pop ";
     $sql1 .= ", iscapitals(l.x,l.y) cap ";
     $sql1 .= ", a.name art ";
-    $sql1 .= ", silverg(l.uid) silver "; # This made stall.
+    $sql1 .= ", silverg(l.uid) silver "; # stall was fixed. It was because two silver artifact caused.
 
     my $sql2a  = ", concat('<input type=checkbox name=village value=', l.vid, case v.enabled when 1 then ' checked ' else '' end, '>' ) chk ";
 
-    my $sql3a  = " where l.aid = 22 ";
-       $sql3a .= " group by l.vid ";
-       $sql3a .= " order by duration desc;";
-
     my $sql2f  = " from $t_art a join last l on a.x = l.x and a.y = l.y ";
     $sql2f    .= " left outer join $fakevil v on v.vid = l.vid and v.fs = $id ";
-    my $sql3a  = " where l.aid = 22 ";
     
-    # print "DBG: $sql1 $sql2f";
-    # $sth = do_sql($db, $sql1.$sql2a.$sql3a);
+    my $sql3a  = " where l.aid in ($tg_aidlist) ";
+       $sql3a .= " group by l.vid ";
+       $sql3a .= " order by duration desc";
+    
     $sth = do_sql($db, "$sql1 $sql2a $sql2f $sql3a ;");
     print "Artifacts.";
     show_data_table($sth);
