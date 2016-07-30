@@ -776,7 +776,7 @@ sub show_last_comment {
     for(my $i=0; $i<$num_rows;$i++){
 	print "<tr>";
 	my ($who,$com) = $sth->fetchrow_array;
-	print "<td>$who</td><td align=left>$com</td>\n";
+	print "<td>$who</td><td align=left><pre>$com</pre></td>\n";
 	print "</tr>";
     }
     print "</table>\n";
